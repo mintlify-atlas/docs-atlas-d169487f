@@ -1,0 +1,388 @@
+---
+title: Performance & Bundle Size
+description: Benchmarks, optimization tips, and bundle size comparison
+---
+
+Uniku is designed for performance-sensitive contexts like ORMs and high-throughput services. This guide covers benchmarks, bundle size, and optimization strategies.
+
+## Benchmark Results
+
+Comparison of `uniku` string ID generation against equivalent npm packages:
+
+| Generator | uniku vs npm | Notes |
+|-----------|-------------:|-------|
+| **ULID** | **85× faster** | Optimized Crockford Base32 encoding |
+| **CUID2** | **8× faster** | Efficient BigInt operations and pooling |
+| **KSUID** | **1.5× faster** | Streamlined Base62 encoding |
+| **UUID v7** | **1.1× faster** | Inlined hot path, reusable buffers |
+| **Nanoid** | **~comparable speed** | Both use similar pooling strategies |
+| **UUID v4** | npm is 1.1× faster | Native `crypto.randomUUID()` is hard to beat |
+
+<Info>
+Benchmarks run on Node.js 22 with [tinybench](https://github.com/tinylibs/tinybench). Results may vary by runtime and hardware. Source code available in the [uniku repository](https://github.com/jkomyno/uniku).
+</Info>
+
+### Why Is ULID 85× Faster?
+
+The npm `ulid` package has performance bottlenecks in Base32 encoding:
+
+```typescript
+// ❌ Slow: String concatenation in loop
+let str = ''
+for (let i = 0; i < 26; i++) {
+  str += ALPHABET[value & 0x1f]
+  value = value >> 5
+}
+
+// ✅ Fast: Pre-allocated array with direct indexing
+const chars = new Array(26)
+for (let i = 0; i < 26; i++) {
+  chars[i] = ALPHABET[value & 0x1f]
+  value = value >> 5
+}
+return chars.join('')
+```
+
+Uniku uses optimized algorithms throughout:
+- Pre-allocated arrays instead of string concatenation
+- Bit manipulation instead of division
+- Inline fast paths for common cases
+
+### Why Is CUID2 8× Faster?
+
+The `@paralleldrive/cuid2` package creates new random bytes for every operation. Uniku pools random bytes:
+
+```typescript
+// ❌ Slow: Generate fresh random bytes every call
+function cuid2() {
+  const random = new Uint8Array(32)
+  crypto.getRandomValues(random)
+  // ... use random bytes
+}
+
+// ✅ Fast: Pool random bytes, refill when depleted
+const pool = new Uint8Array(4096)
+let poolOffset = 0
+
+function cuid2() {
+  if (poolOffset + 32 > pool.length) {
+    crypto.getRandomValues(pool)
+    poolOffset = 0
+  }
+  const random = pool.subarray(poolOffset, poolOffset + 32)
+  poolOffset += 32
+  // ... use random bytes
+}
+```
+
+## Bundle Size Comparison
+
+Only import what you use — each entry point is independently tree-shakeable:
+
+| Import | Minified + gzipped | Use Case |
+|--------|-------------------:|---------|
+| `uniku/uuid/v4` | **~940 B** | Random UUIDs |
+| `uniku/uuid/v7` | **~1.1 KB** | Time-ordered UUIDs |
+| `uniku/ulid` | **~1.5 KB** | Compact time-ordered IDs |
+| `uniku/cuid2` | **~1.1 KB*** | Secure non-sequential IDs |
+| `uniku/nanoid` | **~938 B** | URL-friendly short IDs |
+| `uniku/ksuid` | **~1.0 KB** | K-sortable IDs |
+
+<Note>
+\* CUID2 includes SHA3-512 hashing via `@noble/hashes`. If you already use `@noble/hashes` in your project, the incremental cost is minimal.
+</Note>
+
+### Tree-Shaking
+
+Uniku uses separate entry points instead of barrel exports:
+
+```typescript
+// ✅ Good: Only bundles UUID v7 code (~1.1 KB)
+import { uuidv7 } from 'uniku/uuid/v7'
+
+// ❌ Bad: Would bundle everything if we had a barrel export
+// import { uuidv7 } from 'uniku' // Not available!
+```
+
+**Bundle Impact Example:**
+
+```typescript
+// Scenario 1: Only use UUID v7
+import { uuidv7 } from 'uniku/uuid/v7'
+const id = uuidv7()
+// Bundle size: ~1.1 KB
+
+// Scenario 2: Use UUID v7 and Nanoid
+import { uuidv7 } from 'uniku/uuid/v7'
+import { nanoid } from 'uniku/nanoid'
+const id1 = uuidv7()
+const id2 = nanoid()
+// Bundle size: ~2.0 KB (1.1 KB + 0.9 KB)
+```
+
+### Comparison with Other Libraries
+
+| Package | Size (minified + gzipped) | Tree-shakeable |
+|---------|-------------------------:|:--------------:|
+| `uniku/uuid/v4` | **940 B** | ✅ |
+| `uuid@v13` | ~2.5 KB | ✅ |
+| `uniku/nanoid` | **938 B** | ✅ |
+| `nanoid` | ~940 B | ✅ |
+| `uniku/ulid` | **1.5 KB** | ✅ |
+| `ulid` | ~2.1 KB | ✅ |
+| `uniku/cuid2` | **1.1 KB** | ✅ |
+| `@paralleldrive/cuid2` | ~3.8 KB | ✅ |
+| `uniku/ksuid` | **1.0 KB** | ✅ |
+| `@owpz/ksuid` | ~4.2 KB | ❌ |
+
+<Tip>
+For the smallest possible bundle, use `uniku/nanoid` or `uniku/uuid/v4` — both under 1 KB gzipped.
+</Tip>
+
+## Performance Best Practices
+
+### 1. Use the Fast Path
+
+Don't pass options unless you need to:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+// ✅ Fast path: No options
+const id = uuidv7()
+
+// ❌ Slower: Options bypass optimized hot path
+const id2 = uuidv7({ msecs: Date.now() })
+```
+
+The fast path (no options) uses:
+- Inlined state management
+- Reusable buffers
+- Minimal branching
+
+### 2. Batch Generation with Buffers
+
+When generating many IDs, write directly to a buffer:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+// Generate 100 UUIDs into a single buffer
+const buffer = new Uint8Array(100 * 16)
+for (let i = 0; i < 100; i++) {
+  uuidv7(undefined, buffer, i * 16)
+}
+
+// Convert to strings later if needed
+for (let i = 0; i < 100; i++) {
+  const bytes = buffer.subarray(i * 16, (i + 1) * 16)
+  const str = uuidv7.fromBytes(bytes)
+}
+```
+
+<Info>
+Writing to buffers is faster when you need to serialize IDs later (e.g., storing in a database or sending over the network).
+</Info>
+
+### 3. Reuse Buffers
+
+For repeated operations, reuse the same buffer:
+
+```typescript
+import { ulid } from 'uniku/ulid'
+
+// Reuse buffer for multiple operations
+const buffer = new Uint8Array(16)
+
+function generateAndStore() {
+  // Generate ULID bytes
+  ulid(undefined, buffer, 0)
+  
+  // Write directly to database/network
+  await db.insert({ id: buffer })
+  
+  // No string allocation needed!
+}
+```
+
+### 4. Choose the Right Format
+
+Different formats have different performance characteristics:
+
+```typescript
+// Fastest string generation
+import { nanoid } from 'uniku/nanoid'
+const id = nanoid() // Simple Base64 encoding
+
+// Fast with binary support
+import { uuidv7 } from 'uniku/uuid/v7'
+const id2 = uuidv7() // Fast hot path + byte conversion
+
+// Slower but secure
+import { cuid2 } from 'uniku/cuid2'
+const id3 = cuid2() // SHA3-512 hashing overhead
+```
+
+**Performance ranking (fastest to slowest):**
+
+1. UUID v4 (when using default `crypto.randomUUID()`)
+2. Nanoid (simple pooling)
+3. UUID v7 (inlined hot path)
+4. ULID (Base32 encoding)
+5. KSUID (Base62 encoding)
+6. CUID2 (hashing overhead)
+
+### 5. Avoid Custom Options in Hot Paths
+
+Custom options disable optimizations:
+
+```typescript
+import { nanoid } from 'uniku/nanoid'
+
+// ✅ Fast: Uses pre-allocated pool
+for (let i = 0; i < 1000; i++) {
+  const id = nanoid()
+}
+
+// ❌ Slower: Custom alphabet disables power-of-2 optimization
+for (let i = 0; i < 1000; i++) {
+  const id = nanoid({ alphabet: '0123456789' })
+}
+```
+
+## When Performance Matters
+
+### High-Throughput Services
+
+If you're generating thousands of IDs per second:
+
+```typescript
+import { ulid } from 'uniku/ulid'
+
+// Example: API server creating many records
+app.post('/batch', async (req, res) => {
+  const items = req.body.items.map(item => ({
+    id: ulid(), // Fast generation
+    ...item
+  }))
+  
+  await db.insert(items)
+  res.json({ created: items.length })
+})
+```
+
+<Tip>
+**Recommendation:** Use ULID or UUID v7 for optimal balance of speed and functionality.
+</Tip>
+
+### ORMs and Database Layers
+
+Many ORMs generate IDs on every insert:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+class User {
+  id = uuidv7() // Called on every new User()
+  email: string
+  createdAt = new Date()
+}
+
+// Creating 1000 users
+const users = Array.from({ length: 1000 }, () => new User())
+```
+
+Uniku's performance optimizations shine in these scenarios.
+
+### Serverless and Edge Functions
+
+Cold starts matter. Smaller bundle = faster cold start:
+
+```typescript
+// Cloudflare Worker
+import { nanoid } from 'uniku/nanoid' // Only 938 B
+
+export default {
+  async fetch(request) {
+    const id = nanoid()
+    return new Response(JSON.stringify({ id }))
+  }
+}
+```
+
+## Runtime Compatibility
+
+Uniku works everywhere using Web Crypto API:
+
+```typescript
+// All runtimes support globalThis.crypto
+const crypto = globalThis.crypto
+
+// Node.js (v16+)
+import { uuidv7 } from 'uniku/uuid/v7'
+const id = uuidv7()
+
+// Deno
+import { uuidv7 } from 'npm:uniku/uuid/v7'
+const id = uuidv7()
+
+// Bun
+import { uuidv7 } from 'uniku/uuid/v7'
+const id = uuidv7()
+
+// Cloudflare Workers
+import { uuidv7 } from 'uniku/uuid/v7'
+const id = uuidv7()
+
+// Browsers
+import { uuidv7 } from 'uniku/uuid/v7'
+const id = uuidv7()
+```
+
+<Note>
+**No Node.js-specific APIs** means zero compatibility issues across runtimes.
+</Note>
+
+## Profiling Tips
+
+Measure performance in your own application:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+// Simple benchmark
+const iterations = 100_000
+const start = performance.now()
+
+for (let i = 0; i < iterations; i++) {
+  uuidv7()
+}
+
+const end = performance.now()
+const opsPerSec = (iterations / (end - start)) * 1000
+
+console.log(`${opsPerSec.toFixed(0)} ops/sec`)
+// Example output: 2,500,000 ops/sec
+```
+
+<Tip>
+For accurate benchmarks, use [tinybench](https://github.com/tinylibs/tinybench) or [benchmark.js](https://github.com/bestiejs/benchmark.js) to account for warm-up, garbage collection, and statistical variance.
+</Tip>
+
+## Summary
+
+<Accordion title="Performance Checklist">
+
+- ✅ Use the default (no options) for fastest generation
+- ✅ Choose the right format for your use case
+- ✅ Write to buffers for batch operations
+- ✅ Reuse buffers when possible
+- ✅ Import only what you need (tree-shaking)
+- ❌ Don't pass custom options in hot paths
+- ❌ Don't use string concatenation for batch operations
+
+</Accordion>
+
+<Note>
+**Bottom line:** Uniku is fast enough for any use case. For most applications, the performance difference between ID formats is negligible compared to network and database latency.
+</Note>

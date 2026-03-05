@@ -1,0 +1,509 @@
+---
+title: "Errors"
+description: "Error classes and types for uniku ID generators"
+---
+
+# Errors
+
+All uniku ID generators export standardized error classes for consistent error handling across different ID types.
+
+## Import
+
+```typescript
+// Import from specific generator
+import { InvalidInputError, BufferError, ParseError, UniqueIdError } from 'uniku/uuid/v4'
+import { InvalidInputError, ParseError, UniqueIdError } from 'uniku/cuid2'
+import { InvalidInputError, UniqueIdError } from 'uniku/nanoid'
+```
+
+## Error Hierarchy
+
+All errors extend the base `UniqueIdError` class:
+
+```
+UniqueIdError (abstract base class)
+├── InvalidInputError
+├── ParseError
+└── BufferError
+```
+
+## Base Error: UniqueIdError
+
+Abstract base class for all uniku errors. Provides structured error information compatible with Effect's `catchTag` pattern.
+
+### Properties
+
+<ParamField path="_tag" type="string" required>
+  Discriminated union tag for pattern matching (e.g., `"InvalidInputError"`, `"ParseError"`, `"BufferError"`)
+</ParamField>
+
+<ParamField path="code" type="string" required>
+  Machine-readable error code (e.g., `"UUID_RANDOM_BYTES_TOO_SHORT"`, `"NANOID_ALPHABET_TOO_SHORT"`)
+</ParamField>
+
+<ParamField path="message" type="string" required>
+  Human-readable error message
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Error class name (e.g., `"InvalidInputError"`)
+</ParamField>
+
+### Type Definition
+
+```typescript
+export abstract class UniqueIdError extends Error {
+  abstract readonly _tag: string
+  abstract readonly code: string
+
+  constructor(message: string) {
+    super(message)
+    this.name = this.constructor.name
+  }
+}
+```
+
+## InvalidInputError
+
+Thrown when generator arguments are invalid (bad size, alphabet, length, timestamp, version).
+
+### Properties
+
+<ResponseField name="_tag" type="'InvalidInputError'" required>
+  Always `"InvalidInputError"` for type discrimination
+</ResponseField>
+
+<ResponseField name="code" type="string" required>
+  Specific error code indicating what input was invalid
+</ResponseField>
+
+### Type Definition
+
+```typescript
+export class InvalidInputError extends UniqueIdError {
+  readonly _tag = 'InvalidInputError' as const
+
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+```
+
+### Common Error Codes
+
+#### UUID v4 / UUID v7
+
+<CodeGroup>
+```typescript UUID_RANDOM_BYTES_TOO_SHORT
+// Thrown when random bytes array is too short (< 16 bytes)
+const shortBytes = new Uint8Array(10)
+try {
+  uuidv4({ random: shortBytes })
+} catch (error) {
+  console.log(error.code) // => "UUID_RANDOM_BYTES_TOO_SHORT"
+  console.log(error.message) // => "Random bytes length must be >= 16"
+}
+```
+</CodeGroup>
+
+#### ULID
+
+<CodeGroup>
+```typescript ULID_RANDOM_BYTES_TOO_SHORT
+// Thrown when random bytes array is too short (< 10 bytes)
+const shortBytes = new Uint8Array(5)
+try {
+  ulid({ random: shortBytes })
+} catch (error) {
+  console.log(error.code) // => "ULID_RANDOM_BYTES_TOO_SHORT"
+  console.log(error.message) // => "Random bytes length must be >= 10 for ULID"
+}
+```
+</CodeGroup>
+
+#### CUID2
+
+<CodeGroup>
+```typescript CUID2_LENGTH_OUT_OF_RANGE
+// Thrown when length is not between 2 and 32
+try {
+  cuid2({ length: 50 })
+} catch (error) {
+  console.log(error.code) // => "CUID2_LENGTH_OUT_OF_RANGE"
+  console.log(error.message) // => "CUID2 length must be between 2 and 32. Received: 50"
+}
+```
+
+```typescript CUID2_RANDOM_BYTES_EMPTY
+// Thrown when custom random byte array is empty
+try {
+  cuid2({ random: new Uint8Array(0) })
+} catch (error) {
+  console.log(error.code) // => "CUID2_RANDOM_BYTES_EMPTY"
+  console.log(error.message) // => "Random byte array cannot be empty"
+}
+```
+</CodeGroup>
+
+#### Nanoid
+
+<CodeGroup>
+```typescript NANOID_SIZE_INVALID
+// Thrown when size is not a non-negative integer
+try {
+  nanoid(-5)
+} catch (error) {
+  console.log(error.code) // => "NANOID_SIZE_INVALID"
+  console.log(error.message) // => "Size must be a non-negative integer"
+}
+```
+
+```typescript NANOID_SIZE_TOO_LARGE
+// Thrown when size exceeds 2048
+try {
+  nanoid(5000)
+} catch (error) {
+  console.log(error.code) // => "NANOID_SIZE_TOO_LARGE"
+  console.log(error.message) // => "Size must not exceed 2048"
+}
+```
+
+```typescript NANOID_ALPHABET_TOO_SHORT
+// Thrown when custom alphabet has fewer than 2 characters
+try {
+  nanoid({ alphabet: 'a' })
+} catch (error) {
+  console.log(error.code) // => "NANOID_ALPHABET_TOO_SHORT"
+  console.log(error.message) // => "Alphabet must contain at least 2 characters"
+}
+```
+
+```typescript NANOID_ALPHABET_TOO_LONG
+// Thrown when custom alphabet exceeds 256 characters
+try {
+  nanoid({ alphabet: 'a'.repeat(300) })
+} catch (error) {
+  console.log(error.code) // => "NANOID_ALPHABET_TOO_LONG"
+  console.log(error.message) // => "Alphabet must not exceed 256 characters"
+}
+```
+
+```typescript NANOID_ALPHABET_INVALID_CHAR
+// Thrown when alphabet contains non-printable ASCII
+try {
+  nanoid({ alphabet: 'abc\n123' })
+} catch (error) {
+  console.log(error.code) // => "NANOID_ALPHABET_INVALID_CHAR"
+  console.log(error.message) // => "Alphabet must contain only printable ASCII characters (32-126)"
+}
+```
+
+```typescript NANOID_ALPHABET_DUPLICATE
+// Thrown when alphabet contains duplicate characters
+try {
+  nanoid({ alphabet: 'aabbcc' })
+} catch (error) {
+  console.log(error.code) // => "NANOID_ALPHABET_DUPLICATE"
+  console.log(error.message) // => 'Duplicate character in alphabet: "a"'
+}
+```
+
+```typescript NANOID_RANDOM_BYTES_INSUFFICIENT
+// Thrown when custom random bytes are insufficient for requested size
+try {
+  nanoid({ random: new Uint8Array(5), size: 10 })
+} catch (error) {
+  console.log(error.code) // => "NANOID_RANDOM_BYTES_INSUFFICIENT"
+  console.log(error.message) // => "Insufficient random bytes: need 10, have 5"
+}
+```
+</CodeGroup>
+
+#### KSUID
+
+<CodeGroup>
+```typescript KSUID_RANDOM_BYTES_TOO_SHORT
+// Thrown when random bytes array is too short (< 16 bytes)
+try {
+  ksuid({ random: new Uint8Array(10) })
+} catch (error) {
+  console.log(error.code) // => "KSUID_RANDOM_BYTES_TOO_SHORT"
+  console.log(error.message) // => "Random bytes length must be >= 16 for KSUID"
+}
+```
+
+```typescript KSUID_TIMESTAMP_TOO_LOW
+// Thrown when timestamp is before KSUID epoch (May 13, 2014)
+try {
+  ksuid({ secs: 1000000000 }) // Before KSUID epoch
+} catch (error) {
+  console.log(error.code) // => "KSUID_TIMESTAMP_TOO_LOW"
+  console.log(error.message) // => "Timestamp must be >= KSUID epoch"
+}
+```
+</CodeGroup>
+
+## ParseError
+
+Thrown when parsing/decoding an ID string that has invalid format or characters.
+
+### Properties
+
+<ResponseField name="_tag" type="'ParseError'" required>
+  Always `"ParseError"` for type discrimination
+</ResponseField>
+
+<ResponseField name="code" type="string" required>
+  Specific error code indicating what parsing failed
+</ResponseField>
+
+### Type Definition
+
+```typescript
+export class ParseError extends UniqueIdError {
+  readonly _tag = 'ParseError' as const
+
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+```
+
+### When It's Thrown
+
+<CodeGroup>
+```typescript UUID parsing
+import { uuidv4, ParseError } from 'uniku/uuid/v4'
+
+try {
+  const bytes = uuidv4.toBytes("invalid-uuid-string")
+} catch (error) {
+  if (error instanceof ParseError) {
+    console.log('Invalid UUID format')
+  }
+}
+```
+
+```typescript ULID parsing
+import { ulid, ParseError } from 'uniku/ulid'
+
+try {
+  const bytes = ulid.toBytes("invalid-ulid!")
+} catch (error) {
+  if (error instanceof ParseError) {
+    console.log('Invalid ULID format')
+  }
+}
+```
+
+```typescript KSUID parsing
+import { ksuid, ParseError } from 'uniku/ksuid'
+
+try {
+  const bytes = ksuid.toBytes("not-a-valid-ksuid")
+} catch (error) {
+  if (error instanceof ParseError) {
+    console.log('Invalid KSUID format')
+  }
+}
+```
+</CodeGroup>
+
+## BufferError
+
+Thrown when a byte array or buffer is too short or an offset is out of bounds.
+
+### Properties
+
+<ResponseField name="_tag" type="'BufferError'" required>
+  Always `"BufferError"` for type discrimination
+</ResponseField>
+
+<ResponseField name="code" type="string" required>
+  Specific error code indicating what buffer operation failed
+</ResponseField>
+
+### Type Definition
+
+```typescript
+export class BufferError extends UniqueIdError {
+  readonly _tag = 'BufferError' as const
+
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+```
+
+### Common Error Codes
+
+<CodeGroup>
+```typescript UUID_BUFFER_OUT_OF_BOUNDS
+// Thrown when buffer offset + 16 bytes exceeds buffer length
+import { uuidv4, BufferError } from 'uniku/uuid/v4'
+
+const buffer = new Uint8Array(10) // Too small
+
+try {
+  uuidv4(undefined, buffer, 0) // Needs 16 bytes
+} catch (error) {
+  if (error instanceof BufferError) {
+    console.log(error.code) // => "UUID_BUFFER_OUT_OF_BOUNDS"
+    console.log(error.message) // => "UUID byte range 0:15 is out of buffer bounds"
+  }
+}
+```
+
+```typescript ULID_BUFFER_OUT_OF_BOUNDS
+// Thrown when buffer offset + 16 bytes exceeds buffer length
+import { ulid, BufferError } from 'uniku/ulid'
+
+const buffer = new Uint8Array(20)
+
+try {
+  ulid(undefined, buffer, 10) // Only 10 bytes left, needs 16
+} catch (error) {
+  if (error instanceof BufferError) {
+    console.log(error.code) // => "ULID_BUFFER_OUT_OF_BOUNDS"
+  }
+}
+```
+
+```typescript KSUID_BUFFER_OUT_OF_BOUNDS
+// Thrown when buffer offset + 20 bytes exceeds buffer length
+import { ksuid, BufferError } from 'uniku/ksuid'
+
+const buffer = new Uint8Array(15) // Too small, needs 20 bytes
+
+try {
+  ksuid(undefined, buffer, 0)
+} catch (error) {
+  if (error instanceof BufferError) {
+    console.log(error.code) // => "KSUID_BUFFER_OUT_OF_BOUNDS"
+    console.log(error.message) // => "KSUID byte range 0:19 is out of buffer bounds"
+  }
+}
+```
+</CodeGroup>
+
+## Error Handling Patterns
+
+### Type Guards
+
+```typescript
+import { uuidv4, InvalidInputError, BufferError, ParseError } from 'uniku/uuid/v4'
+
+try {
+  const id = uuidv4({ random: new Uint8Array(10) })
+} catch (error) {
+  if (error instanceof InvalidInputError) {
+    console.log('Invalid input:', error.code)
+  } else if (error instanceof BufferError) {
+    console.log('Buffer error:', error.code)
+  } else if (error instanceof ParseError) {
+    console.log('Parse error:', error.code)
+  } else {
+    throw error // Re-throw unknown errors
+  }
+}
+```
+
+### Effect-style Pattern Matching
+
+The `_tag` property enables discriminated union pattern matching:
+
+```typescript
+import { uuidv4, UniqueIdError } from 'uniku/uuid/v4'
+
+try {
+  const id = uuidv4({ random: new Uint8Array(10) })
+} catch (error) {
+  if (error instanceof UniqueIdError) {
+    switch (error._tag) {
+      case 'InvalidInputError':
+        console.log('Invalid input:', error.code)
+        break
+      case 'BufferError':
+        console.log('Buffer error:', error.code)
+        break
+      case 'ParseError':
+        console.log('Parse error:', error.code)
+        break
+    }
+  }
+}
+```
+
+### Code-based Handling
+
+```typescript
+import { nanoid, InvalidInputError } from 'uniku/nanoid'
+
+try {
+  const id = nanoid({ alphabet: 'a' })
+} catch (error) {
+  if (error instanceof InvalidInputError) {
+    switch (error.code) {
+      case 'NANOID_ALPHABET_TOO_SHORT':
+        console.log('Alphabet must have at least 2 characters')
+        break
+      case 'NANOID_ALPHABET_DUPLICATE':
+        console.log('Alphabet contains duplicate characters')
+        break
+      case 'NANOID_SIZE_TOO_LARGE':
+        console.log('Size exceeds maximum allowed')
+        break
+      default:
+        console.log('Unknown error:', error.message)
+    }
+  }
+}
+```
+
+### Validation Before Generation
+
+Prevent errors by validating inputs:
+
+```typescript
+import { nanoid } from 'uniku/nanoid'
+
+function generateSafeNanoid(size: number, alphabet?: string): string {
+  // Validate size
+  if (!Number.isInteger(size) || size < 0) {
+    throw new Error('Size must be a non-negative integer')
+  }
+  if (size > 2048) {
+    throw new Error('Size must not exceed 2048')
+  }
+
+  // Validate alphabet
+  if (alphabet !== undefined) {
+    if (alphabet.length < 2) {
+      throw new Error('Alphabet must contain at least 2 characters')
+    }
+    if (new Set(alphabet).size !== alphabet.length) {
+      throw new Error('Alphabet contains duplicate characters')
+    }
+  }
+
+  return nanoid({ size, alphabet })
+}
+```
+
+## See Also
+
+- [UUID v4](/api/uuidv4)
+- [UUID v7](/api/uuidv7)
+- [ULID](/api/ulid)
+- [CUID2](/api/cuid2)
+- [Nanoid](/api/nanoid)
+- [KSUID](/api/ksuid)

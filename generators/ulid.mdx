@@ -1,0 +1,361 @@
+---
+title: ULID
+description: Lexicographically sortable unique identifiers with Crockford Base32 encoding
+---
+
+# ULID
+
+ULID (Universally Unique Lexicographically Sortable Identifier) is a 128-bit identifier with millisecond timestamp precision and 80 bits of randomness. ULIDs are URL-safe, use Crockford's Base32 encoding, and sort lexicographically by creation time.
+
+## When to Use
+
+Use ULID when you need:
+- **Time-ordered IDs** - Sortable by creation time
+- **URL-safe format** - No special characters, case-insensitive
+- **Compact representation** - 26 characters vs UUID's 36
+- **Human-readable** - Crockford Base32 avoids ambiguous characters (no 0/O or 1/I/l)
+
+<Info>
+ULID is an excellent choice for database primary keys, offering similar benefits to UUID v7 with a more compact string format.
+</Info>
+
+## Basic Usage
+
+```typescript
+import { ulid } from 'uniku/ulid'
+
+const id = ulid()
+// => "01HW9T2W9W9YJ3JZ1H4P4M2T8Q"
+
+// IDs are naturally sortable
+const [first, second, third] = [ulid(), ulid(), ulid()]
+console.log(first < second && second < third) // true
+```
+
+## API Reference
+
+### Main Function
+
+<ParamField path="ulid()" type="() => string">
+  Generate a ULID string with current timestamp and automatic monotonic ordering.
+</ParamField>
+
+<ParamField path="ulid(options)" type="(options?: UlidOptions) => string">
+  Generate a ULID string with custom options.
+  
+  **Options:**
+  - `msecs?: number` - Timestamp in milliseconds (defaults to `Date.now()`)
+  - `random?: Uint8Array` - 16 bytes of random data (only first 10 bytes used)
+</ParamField>
+
+<ParamField path="ulid(options, buf, offset)" type="<TBuf extends Uint8Array>(options: UlidOptions | undefined, buf: TBuf, offset?: number) => TBuf">
+  Write ULID bytes directly into a buffer at the specified offset.
+  
+  **Parameters:**
+  - `options` - ULID generation options or `undefined`
+  - `buf` - Target buffer (must have at least 16 bytes available from offset)
+  - `offset` - Starting position in buffer (default: 0)
+  
+  **Returns:** The same buffer passed in (for chaining)
+</ParamField>
+
+### Static Methods
+
+<ParamField path="ulid.toBytes(id)" type="(id: string) => Uint8Array">
+  Convert a ULID string to a 16-byte `Uint8Array`.
+  
+  ```typescript
+  const bytes = ulid.toBytes("01HW9T2W9W9YJ3JZ1H4P4M2T8Q")
+  // => Uint8Array(16) [1, 142, 94, 92, ...]
+  ```
+</ParamField>
+
+<ParamField path="ulid.fromBytes(bytes)" type="(bytes: Uint8Array) => string">
+  Convert a 16-byte `Uint8Array` to a ULID string.
+  
+  ```typescript
+  const id = ulid.fromBytes(bytes)
+  // => "01HW9T2W9W9YJ3JZ1H4P4M2T8Q"
+  ```
+</ParamField>
+
+<ParamField path="ulid.timestamp(id)" type="(id: string) => number">
+  Extract the embedded timestamp from a ULID string. Returns milliseconds since Unix epoch.
+  
+  ```typescript
+  const id = ulid()
+  const ts = ulid.timestamp(id)
+  console.log(new Date(ts)) // Original creation time
+  ```
+</ParamField>
+
+<ParamField path="ulid.isValid(id)" type="(id: unknown) => id is string">
+  Validate that a value is a properly formatted ULID string. TypeScript type guard.
+  
+  ```typescript
+  ulid.isValid("01HW9T2W9W9YJ3JZ1H4P4M2T8Q") // true
+  ulid.isValid("not-a-ulid") // false
+  ```
+</ParamField>
+
+### Constants
+
+<ParamField path="ulid.NIL" type="string">
+  The nil ULID (all zeros): `"00000000000000000000000000"`
+</ParamField>
+
+<ParamField path="ulid.MAX" type="string">
+  The max ULID (maximum valid value): `"7ZZZZZZZZZZZZZZZZZZZZZZZZZ"`
+</ParamField>
+
+## Monotonic Ordering
+
+ULID maintains module-level state to ensure IDs generated within the same millisecond remain monotonically increasing:
+
+```typescript
+import { ulid } from 'uniku/ulid'
+
+// All generated in the same millisecond
+const id1 = ulid()
+const id2 = ulid()
+const id3 = ulid()
+
+// Random portion is incremented for monotonicity
+console.log(id1 < id2 && id2 < id3) // true
+```
+
+<Warning>
+**State Persistence:** The monotonic state persists across all `ulid()` calls in the module's lifetime. In serverless/edge functions with warm starts, this state persists between invocations.
+
+For isolated state in tests, provide explicit `msecs` and `random` options.
+</Warning>
+
+<Note>
+**Cloudflare Workers:** By default, Cloudflare Workers "freezes" time during request handling to prevent side-channel attacks. This means `Date.now()` returns the same value for an entire request, so all ULIDs generated within a single request will have the same timestamp. The monotonic ordering relies entirely on incrementing the random portion.
+</Note>
+
+## Real-World Examples
+
+### Database Primary Keys
+
+```typescript
+import { ulid } from 'uniku/ulid'
+
+// Postgres with TEXT or VARCHAR column
+await db.execute(`
+  CREATE TABLE posts (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )
+`)
+
+const postId = ulid()
+await db.insert('posts', {
+  id: postId,
+  title: 'Hello World'
+})
+
+// Query posts in chronological order by ID alone
+const posts = await db.query('SELECT * FROM posts ORDER BY id')
+```
+
+### File Naming
+
+```typescript
+import { ulid } from 'uniku/ulid'
+
+// Generate sortable filenames
+const filename = `upload-${ulid()}.jpg`
+// => "upload-01HW9T2W9W9YJ3JZ1H4P4M2T8Q.jpg"
+
+// Files naturally sort by creation time in directory listings
+const files = await fs.readdir('./uploads')
+files.sort() // Already in chronological order!
+```
+
+### URL Slugs
+
+```typescript
+import { ulid } from 'uniku/ulid'
+
+// ULID is URL-safe (no special encoding needed)
+const shortUrl = `https://example.com/s/${ulid()}`
+// => "https://example.com/s/01HW9T2W9W9YJ3JZ1H4P4M2T8Q"
+```
+
+### Log Correlation
+
+```typescript
+import { ulid } from 'uniku/ulid'
+
+interface LogEntry {
+  id: string
+  timestamp: number
+  level: string
+  message: string
+}
+
+function log(level: string, message: string): LogEntry {
+  const id = ulid()
+  return {
+    id,
+    timestamp: ulid.timestamp(id), // Extract embedded timestamp
+    level,
+    message
+  }
+}
+
+// Logs are sortable by ID
+const logs = [
+  log('info', 'Server started'),
+  log('warn', 'Rate limit exceeded'),
+  log('error', 'Database connection failed')
+]
+
+logs.sort((a, b) => a.id.localeCompare(b.id))
+```
+
+### Testing with Deterministic Output
+
+```typescript
+import { ulid } from 'uniku/ulid'
+
+const testId = ulid({
+  msecs: 1702387456789,
+  random: new Uint8Array(10).fill(0)
+})
+// => "01HJK6B5YGRG00000000000000"
+
+// Same inputs = same output
+const testId2 = ulid({
+  msecs: 1702387456789,
+  random: new Uint8Array(10).fill(0)
+})
+console.log(testId === testId2) // true
+```
+
+## Type Definitions
+
+```typescript
+type UlidOptions = {
+  /**
+   * 16 bytes of random data to use for ULID generation.
+   * Only the first 10 bytes are used.
+   */
+  random?: Uint8Array
+  /**
+   * Timestamp in milliseconds since Unix epoch.
+   * Defaults to Date.now().
+   */
+  msecs?: number
+}
+
+type Ulid = {
+  (): string
+  <TBuf extends Uint8Array = Uint8Array>(
+    options: UlidOptions | undefined, 
+    buf: TBuf, 
+    offset?: number
+  ): TBuf
+  (options?: UlidOptions, buf?: undefined, offset?: number): string
+  toBytes(id: string): Uint8Array
+  fromBytes(bytes: Uint8Array): string
+  timestamp(id: string): number
+  isValid(id: unknown): id is string
+  NIL: string
+  MAX: string
+}
+```
+
+## Structure
+
+ULID consists of 128 bits encoded as 26 Crockford Base32 characters:
+
+```
+ 01HW9T2W9W 9YJ3JZ1H4P4M2T8Q
+|----------|  |--------------|
+  Timestamp        Random
+   (48 bits)      (80 bits)
+   10 chars        16 chars
+```
+
+- **First 10 characters:** 48-bit timestamp (milliseconds since Unix epoch)
+- **Last 16 characters:** 80 bits of cryptographically secure randomness
+
+## Crockford Base32 Alphabet
+
+ULID uses Crockford's Base32 encoding, which excludes ambiguous characters:
+
+```
+0123456789ABCDEFGHJKMNPQRSTVWXYZ
+```
+
+**Excluded:** `I`, `L`, `O`, `U` (easily confused with `1`, `0`, etc.)
+
+<Tip>
+Crockford Base32 is **case-insensitive** for decoding but generates uppercase by default. The validation regex accepts both cases.
+</Tip>
+
+## Performance Characteristics
+
+<CardGroup cols={2}>
+  <Card title="Generation Speed" icon="bolt">
+    **85× faster** than `ulid` npm package
+  </Card>
+  <Card title="Sortability" icon="arrow-up-1-9">
+    Lexicographically sortable by creation time
+  </Card>
+  <Card title="Compactness" icon="compress">
+    26 characters (28% shorter than UUID)
+  </Card>
+  <Card title="Entropy" icon="shield">
+    80 bits of cryptographically secure randomness
+  </Card>
+</CardGroup>
+
+<Info>
+**Bundle Size:** ~1.5 KB minified + gzipped
+</Info>
+
+## Validation Pattern
+
+ULID must match this pattern:
+```regex
+/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i
+```
+
+Key characteristics:
+- Exactly 26 characters
+- First character is `0-7` (prevents timestamp overflow)
+- Remaining characters from Crockford Base32 alphabet
+- Case-insensitive
+
+## Migration Guide
+
+### From `ulid` Package
+
+```diff
+- import { ulid } from 'ulid'
++ import { ulid } from 'uniku/ulid'
+
+  const id = ulid()
+```
+
+API is identical - drop-in replacement with **85× better performance**.
+
+### From UUID v7
+
+```diff
+- import { uuidv7 } from 'uniku/uuid/v7'
++ import { ulid } from 'uniku/ulid'
+
+- const id = uuidv7()
++ const id = ulid()
+```
+
+Benefit: Shorter IDs (26 vs 36 characters) with similar sortability.
+
+<Tip>
+For even more security against enumeration attacks, consider [CUID2](/generators/cuid2) which uses hashing to prevent predictability.
+</Tip>

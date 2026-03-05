@@ -1,0 +1,637 @@
+---
+title: Migration Guide
+description: Step-by-step guide for migrating from other ID libraries to uniku
+---
+
+Migrating from another ID library? This guide covers all the major packages and explains how to switch to uniku with minimal code changes.
+
+## Quick Migration Overview
+
+| From Package | Effort | Drop-in? | Notes |
+|--------------|:------:|:--------:|-------|
+| `uuid` | Easy | ✅ | Import path change only |
+| `nanoid` | Easy | ✅ | API identical |
+| `ulid` | Easy | ✅ | API identical |
+| `@paralleldrive/cuid2` | Easy | ⚠️ | Function name change |
+| `@owpz/ksuid` | Moderate | ❌ | Class-based → functional API |
+
+## From `uuid`
+
+<Accordion title="uuid → uniku Migration">
+
+The `uuid` package is the most popular UUID library. Uniku provides a nearly identical API with better performance.
+
+### UUID v4
+
+```diff
+- import { v4 as uuidv4 } from 'uuid'
++ import { uuidv4 } from 'uniku/uuid/v4'
+
+  const id = uuidv4()
+  // => "550e8400-e29b-41d4-a716-446655440000"
+```
+
+### UUID v7
+
+```diff
+- import { v7 as uuidv7 } from 'uuid'
++ import { uuidv7 } from 'uniku/uuid/v7'
+
+  const id = uuidv7()
+  // => "018e5e5c-7c8a-7000-8000-000000000000"
+```
+
+### Validation
+
+```diff
+- import { validate, version } from 'uuid'
++ import { uuidv4 } from 'uniku/uuid/v4'
++ import { uuidv7 } from 'uniku/uuid/v7'
+
+- if (validate(id) && version(id) === 4) {
++ if (uuidv4.isValid(id)) {
+    console.log('Valid UUID v4')
+  }
+
+- if (validate(id) && version(id) === 7) {
++ if (uuidv7.isValid(id)) {
+    console.log('Valid UUID v7')
+  }
+```
+
+### Byte Conversion
+
+```diff
+- import { parse, stringify } from 'uuid'
++ import { uuidv4 } from 'uniku/uuid/v4'
+
+  const id = "550e8400-e29b-41d4-a716-446655440000"
+  
+- const bytes = parse(id)
++ const bytes = uuidv4.toBytes(id)
+  
+- const str = stringify(bytes)
++ const str = uuidv4.fromBytes(bytes)
+```
+
+### Buffer Writing
+
+```diff
+- import { v4 as uuidv4 } from 'uuid'
++ import { uuidv4 } from 'uniku/uuid/v4'
+
+  const buffer = new Uint8Array(16)
+  
+- uuidv4(null, buffer, 0)
++ uuidv4(undefined, buffer, 0)
+```
+
+### Constants
+
+```diff
+- import { NIL, MAX } from 'uuid'
++ import { uuidv4 } from 'uniku/uuid/v4'
+
+- const nil = NIL
++ const nil = uuidv4.NIL
+  
+- const max = MAX
++ const max = uuidv4.MAX
+```
+
+### Breaking Changes
+
+<Warning>
+**Unsupported UUID versions:** Uniku only supports UUID v4 and v7. If you need v1, v3, v5, or v6, continue using the `uuid` package or submit a feature request.
+</Warning>
+
+**API differences:**
+- `null` → `undefined` for optional parameters
+- `validate()` + `version()` → `uuidv4.isValid()` / `uuidv7.isValid()`
+- `parse()` → `toBytes()`
+- `stringify()` → `fromBytes()`
+
+</Accordion>
+
+## From `nanoid`
+
+<Accordion title="nanoid → uniku Migration">
+
+The `nanoid` package has an identical API. Just change the import:
+
+### Basic Usage
+
+```diff
+- import { nanoid } from 'nanoid'
++ import { nanoid } from 'uniku/nanoid'
+
+  const id = nanoid()
+  // => "V1StGXR8_Z5jdHi6B-myT"
+```
+
+**API is 100% compatible** — drop-in replacement!
+
+### Custom Size
+
+```diff
+- import { nanoid } from 'nanoid'
++ import { nanoid } from 'uniku/nanoid'
+
+  const id = nanoid(10)
+  // => "IRFa-VaY2b"
+```
+
+### Custom Alphabet
+
+```diff
+- import { customAlphabet } from 'nanoid'
++ import { nanoid } from 'uniku/nanoid'
+
+- const nanoid = customAlphabet('0123456789abcdef', 12)
+- const id = nanoid()
++ const id = nanoid({ alphabet: '0123456789abcdef', size: 12 })
+  // => "4f90d13a42bc"
+```
+
+<Note>
+**Difference:** Instead of `customAlphabet()` returning a new function, uniku uses an options object. This is slightly more explicit but requires changing the call site.
+</Note>
+
+### Non-Secure Random (Testing)
+
+```diff
+- import { customRandom } from 'nanoid'
++ import { nanoid } from 'uniku/nanoid'
+
+- const nanoid = customRandom('abcdef', 10, size => {
+-   return (new Uint8Array(size)).map(() => 256 * Math.random())
+- })
++ const random = new Uint8Array(10).map(() => Math.random() * 256)
++ const id = nanoid({ size: 10, alphabet: 'abcdef', random })
+```
+
+### Breaking Changes
+
+<Warning>
+**No `customAlphabet()` or `customRandom()` exports.** Use the options object instead:
+
+```typescript
+import { nanoid } from 'uniku/nanoid'
+
+// Instead of customAlphabet:
+const id = nanoid({ alphabet: 'abc', size: 10 })
+
+// Instead of customRandom:
+const random = new Uint8Array(10)
+const id = nanoid({ random })
+```
+</Warning>
+
+</Accordion>
+
+## From `ulid`
+
+<Accordion title="ulid → uniku Migration">
+
+The `ulid` package API is identical:
+
+### Basic Usage
+
+```diff
+- import { ulid } from 'ulid'
++ import { ulid } from 'uniku/ulid'
+
+  const id = ulid()
+  // => "01HW9T2W9W9YJ3JZ1H4P4M2T8Q"
+```
+
+**API is 100% compatible** — drop-in replacement!
+
+### Custom Timestamp
+
+```diff
+- import { ulid } from 'ulid'
++ import { ulid } from 'uniku/ulid'
+
+  const id = ulid(Date.now())
+  // Works the same
+```
+
+<Note>
+Uniku uses `msecs` in the options object for consistency with other ID types, but also accepts a number as the first argument for compatibility.
+</Note>
+
+### Monotonic Factory
+
+The npm `ulid` package has a `monotonicFactory()` function:
+
+```diff
+- import { monotonicFactory } from 'ulid'
++ import { ulid } from 'uniku/ulid'
+
+- const ulid = monotonicFactory()
+- const id1 = ulid()
+- const id2 = ulid()
++ const id1 = ulid()
++ const id2 = ulid()
+  // Monotonic by default in uniku
+```
+
+<Info>
+**Uniku is monotonic by default.** The module-level state ensures that ULIDs generated within the same millisecond are incremented. No factory function needed!
+</Info>
+
+### Validation
+
+```diff
+- import { isValid } from 'ulid'
++ import { ulid } from 'uniku/ulid'
+
+- if (isValid(id)) {
++ if (ulid.isValid(id)) {
+    console.log('Valid ULID')
+  }
+```
+
+### Decoding Timestamp
+
+```diff
+- import { decodeTime } from 'ulid'
++ import { ulid } from 'uniku/ulid'
+
+  const id = "01HW9T2W9W9YJ3JZ1H4P4M2T8Q"
+  
+- const timestamp = decodeTime(id)
++ const timestamp = ulid.timestamp(id)
+  
+  console.log(new Date(timestamp))
+```
+
+### Breaking Changes
+
+<Warning>
+**No standalone exports** like `decodeTime`, `encodeTime`, `isValid`. All methods are attached to the `ulid` function:
+
+```typescript
+import { ulid } from 'uniku/ulid'
+
+// ❌ Not available:
+// import { decodeTime, isValid } from 'uniku/ulid'
+
+// ✅ Use instead:
+ulid.timestamp(id)
+ulid.isValid(id)
+```
+</Warning>
+
+</Accordion>
+
+## From `@paralleldrive/cuid2`
+
+<Accordion title="@paralleldrive/cuid2 → uniku Migration">
+
+The CUID2 API is nearly identical, with a function name change:
+
+### Basic Usage
+
+```diff
+- import { createId } from '@paralleldrive/cuid2'
++ import { cuid2 } from 'uniku/cuid2'
+
+- const id = createId()
++ const id = cuid2()
+  // => "pfh0haxfpzowht3oi213cqos"
+```
+
+### Custom Length
+
+```diff
+- import { init } from '@paralleldrive/cuid2'
++ import { cuid2 } from 'uniku/cuid2'
+
+- const createId = init({ length: 10 })
+- const id = createId()
++ const id = cuid2({ length: 10 })
+  // => "tz4a98xxat"
+```
+
+<Note>
+**Difference:** Instead of `init()` returning a configured function, uniku uses an options object on each call. This is more functional but requires passing options each time.
+</Note>
+
+### Validation
+
+```diff
+- import { isCuid } from '@paralleldrive/cuid2'
++ import { cuid2 } from 'uniku/cuid2'
+
+- if (isCuid(id)) {
++ if (cuid2.isValid(id)) {
+    console.log('Valid CUID2')
+  }
+```
+
+### Fingerprint
+
+The npm package allows custom fingerprints:
+
+```diff
+- import { init } from '@paralleldrive/cuid2'
++ import { cuid2 } from 'uniku/cuid2'
+
+- const createId = init({ fingerprint: 'my-worker-01' })
+- const id = createId()
++ // Not supported - fingerprint is auto-generated
++ const id = cuid2()
+```
+
+<Warning>
+**Custom fingerprints are not supported** in uniku. The fingerprint is always auto-generated from `globalThis` for security and consistency.
+</Warning>
+
+### Breaking Changes
+
+**API differences:**
+- `createId()` → `cuid2()`
+- `init({ length })` → `cuid2({ length })`
+- `isCuid()` → `cuid2.isValid()`
+- Custom fingerprints not supported
+- No `init()` function (use options instead)
+
+</Accordion>
+
+## From `@owpz/ksuid`
+
+<Accordion title="@owpz/ksuid → uniku Migration">
+
+The `@owpz/ksuid` package uses a class-based API. Uniku uses a functional API:
+
+### Basic Usage
+
+```diff
+- import { KSUID } from '@owpz/ksuid'
++ import { ksuid } from 'uniku/ksuid'
+
+- const id = KSUID.random().toString()
++ const id = ksuid()
+  // => "2QnJjKLvpSfpZqGiPPxVwWLMy2p"
+```
+
+### Byte Conversion
+
+```diff
+- import { KSUID } from '@owpz/ksuid'
++ import { ksuid } from 'uniku/ksuid'
+
+- const bytes = KSUID.random().toBuffer()
++ const bytes = ksuid(undefined, new Uint8Array(20))
+  
+- const fromBuf = KSUID.fromBytes(buffer).toString()
++ const fromStr = ksuid.fromBytes(bytes)
+```
+
+<Note>
+**Key difference:** Uniku uses `Uint8Array` instead of Node.js `Buffer` for universal runtime compatibility.
+</Note>
+
+### Parsing and Timestamp
+
+```diff
+- import { KSUID } from '@owpz/ksuid'
++ import { ksuid } from 'uniku/ksuid'
+
+  const id = "2QnJjKLvpSfpZqGiPPxVwWLMy2p"
+  
+- const parsed = KSUID.parse(id)
+- const timestamp = parsed.timestamp
++ const timestamp = ksuid.timestamp(id)
+  
+- console.log(new Date(timestamp * 1000)) // npm ksuid returns seconds
++ console.log(new Date(timestamp)) // uniku returns milliseconds
+```
+
+<Warning>
+**Timestamp unit difference:**
+- `@owpz/ksuid`: Returns **seconds**
+- `uniku/ksuid`: Returns **milliseconds** (for API consistency with UUID v7 and ULID)
+
+If you need seconds, divide by 1000:
+```typescript
+const seconds = Math.floor(ksuid.timestamp(id) / 1000)
+```
+</Warning>
+
+### Validation
+
+```diff
+- import { KSUID } from '@owpz/ksuid'
++ import { ksuid } from 'uniku/ksuid'
+
+- const valid = KSUID.isValid(id)
++ const valid = ksuid.isValid(id)
+```
+
+### Custom Timestamp
+
+```diff
+- import { KSUID } from '@owpz/ksuid'
++ import { ksuid } from 'uniku/ksuid'
+
+- const id = KSUID.fromParts(Date.now() / 1000, payload).toString()
++ const id = ksuid({ secs: Math.floor(Date.now() / 1000) })
+```
+
+### Breaking Changes
+
+<Warning>
+**Major API differences:**
+
+1. **Class-based → Functional:**
+   - `KSUID.random()` → `ksuid()`
+   - `KSUID.parse(id)` → `ksuid.timestamp(id)`
+   - `instance.toString()` → Just use the string directly
+
+2. **Buffer → Uint8Array:**
+   - Node.js `Buffer` → `Uint8Array` (universal)
+
+3. **Timestamp units:**
+   - Seconds → Milliseconds (for consistency)
+
+4. **Not supported:**
+   - `KSUID.Sequence` (sorting utilities)
+   - `KSUID.CompressedSet` (compression)
+   - `compare()`, `equals()` methods (use string comparison)
+</Warning>
+
+**Migration helper:**
+
+```typescript
+import { ksuid } from 'uniku/ksuid'
+
+// If you need the old API style:
+class KSUID {
+  constructor(private id: string) {}
+  
+  static random() {
+    return new KSUID(ksuid())
+  }
+  
+  static parse(id: string) {
+    return new KSUID(id)
+  }
+  
+  toString() {
+    return this.id
+  }
+  
+  get timestamp() {
+    return Math.floor(ksuid.timestamp(this.id) / 1000) // Convert to seconds
+  }
+  
+  toBuffer() {
+    return Buffer.from(ksuid.toBytes(this.id))
+  }
+}
+
+// Now you can use:
+const id = KSUID.random().toString()
+const parsed = KSUID.parse(id)
+const ts = parsed.timestamp
+```
+
+</Accordion>
+
+## Common Migration Patterns
+
+### TypeScript Types
+
+Uniku exports TypeScript types for all generators:
+
+```typescript
+import { uuidv7, type UuidV7Options } from 'uniku/uuid/v7'
+import { ulid, type UlidOptions } from 'uniku/ulid'
+import { cuid2, type Cuid2Options } from 'uniku/cuid2'
+import { nanoid, type NanoidOptions } from 'uniku/nanoid'
+import { ksuid, type KsuidOptions } from 'uniku/ksuid'
+
+function generateId(options?: UuidV7Options): string {
+  return uuidv7(options)
+}
+```
+
+### Error Handling
+
+Uniku exports specific error types:
+
+```typescript
+import { uuidv4, InvalidInputError, BufferError } from 'uniku/uuid/v4'
+
+try {
+  const buffer = new Uint8Array(8) // Too small
+  uuidv4(undefined, buffer, 0)
+} catch (err) {
+  if (err instanceof BufferError) {
+    console.error('Buffer too small:', err.message)
+  }
+}
+```
+
+**Available errors:**
+- `InvalidInputError`: Invalid input parameters
+- `BufferError`: Buffer size or offset issues
+- `ParseError`: Invalid ID format during parsing
+- `UniqueIdError`: Base class for all uniku errors
+
+### Test Migration
+
+When migrating tests, use deterministic options:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+import { ulid } from 'uniku/ulid'
+
+// Deterministic UUIDs for testing
+const testRandom = new Uint8Array(16).fill(42)
+const id = uuidv7({ 
+  msecs: 1234567890000,
+  seq: 0,
+  random: testRandom 
+})
+
+// Deterministic ULIDs
+const ulidId = ulid({ 
+  msecs: 1234567890000,
+  random: testRandom 
+})
+```
+
+## Bundle Size Impact
+
+Compare bundle sizes before and after migration:
+
+| Before | After | Savings |
+|--------|-------|--------:|
+| `uuid` (2.5 KB) | `uniku/uuid/v7` (1.1 KB) | **56%** |
+| `@paralleldrive/cuid2` (3.8 KB) | `uniku/cuid2` (1.1 KB) | **71%** |
+| `@owpz/ksuid` (4.2 KB) | `uniku/ksuid` (1.0 KB) | **76%** |
+
+<Tip>
+Run `npx bundlephobia <package-name>` to check your actual bundle size before and after migration.
+</Tip>
+
+## Rollback Plan
+
+If you need to roll back:
+
+1. Keep the old package in your `package.json` temporarily
+2. Use feature flags to toggle between implementations:
+
+```typescript
+const USE_UNIKU = process.env.USE_UNIKU === 'true'
+
+const generateId = USE_UNIKU
+  ? () => import('uniku/uuid/v7').then(m => m.uuidv7())
+  : () => import('uuid').then(m => m.v7())
+```
+
+3. Run both implementations in parallel during testing:
+
+```typescript
+import { uuidv7 as unikuV7 } from 'uniku/uuid/v7'
+import { v7 as uuidV7 } from 'uuid'
+
+const id1 = unikuV7({ msecs: 1000, seq: 0, random: testRandom })
+const id2 = uuidV7({ msecs: 1000, seq: 0, random: testRandom })
+
+assert.equal(id1, id2) // Should match for same inputs
+```
+
+## Summary
+
+<Accordion title="Migration Checklist">
+
+**Before migrating:**
+- ✅ Check which UUID versions you use (only v4 and v7 supported)
+- ✅ Identify custom configurations (fingerprints, alphabets, etc.)
+- ✅ Review test suite for hard-coded IDs
+- ✅ Check if you use class-based APIs (KSUID)
+
+**During migration:**
+- ✅ Update import statements
+- ✅ Replace `null` with `undefined` for optional params
+- ✅ Change `createId()` → `cuid2()`
+- ✅ Update KSUID from class to functional API
+- ✅ Convert `Buffer` → `Uint8Array`
+- ✅ Update validation calls
+
+**After migration:**
+- ✅ Run full test suite
+- ✅ Check bundle size reduction
+- ✅ Verify IDs are valid in your database
+- ✅ Monitor performance improvements
+
+</Accordion>
+
+<Note>
+**Need help?** Open an issue on the [uniku GitHub repository](https://github.com/jkomyno/uniku) if you encounter migration problems.
+</Note>

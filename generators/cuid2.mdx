@@ -1,0 +1,329 @@
+---
+title: CUID2
+description: Secure, collision-resistant IDs with SHA3-512 hashing
+---
+
+# CUID2
+
+CUID2 is a secure, collision-resistant identifier that hashes multiple entropy sources using SHA3-512. Unlike time-ordered IDs (ULID, UUID v7), CUID2 prevents enumeration attacks by making IDs non-predictable.
+
+## When to Use
+
+Use CUID2 when you need:
+- **Security against enumeration** - IDs are not predictable
+- **Collision resistance** - Uses multiple entropy sources + hashing
+- **Customizable length** - 2-32 characters (default 24)
+- **Non-sequential IDs** - Prevents guessing next ID
+
+<Warning>
+CUID2 IDs are **NOT time-ordered**. For sortable IDs, use [UUID v7](/generators/uuid-v7) or [ULID](/generators/ulid) instead.
+</Warning>
+
+## Basic Usage
+
+```typescript
+import { cuid2 } from 'uniku/cuid2'
+
+const id = cuid2()
+// => "pfh0haxfpzowht3oi213cqos"
+
+// Custom length (2-32 characters)
+const shortId = cuid2({ length: 10 })
+// => "tz4a98xxat"
+```
+
+## API Reference
+
+### Main Function
+
+<ParamField path="cuid2()" type="() => string">
+  Generate a 24-character CUID2 string with default settings.
+</ParamField>
+
+<ParamField path="cuid2(options)" type="(options?: Cuid2Options) => string">
+  Generate a CUID2 string with custom options.
+  
+  **Options:**
+  - `length?: number` - Length of the generated ID (2-32 characters, default: 24)
+  - `random?: Uint8Array` - Custom random bytes for deterministic testing (must be at least 1 byte; 16+ bytes recommended for adequate entropy)
+  
+  <Note>
+  The fingerprint always uses cryptographically secure random bytes, regardless of the `random` option.
+  </Note>
+</ParamField>
+
+### Static Methods
+
+<ParamField path="cuid2.isValid(id)" type="(id: unknown) => id is string">
+  Validate that a value is a properly formatted CUID2 string. TypeScript type guard.
+  
+  ```typescript
+  cuid2.isValid("pfh0haxfpzowht3oi213cqos") // true
+  cuid2.isValid("not-a-cuid2") // false
+  ```
+</ParamField>
+
+<Note>
+**No Binary Conversion:** Unlike UUID and ULID, CUID2 does not provide `toBytes`/`fromBytes` methods because it is a string-native format with no canonical binary representation. The ID is the result of SHA3-512 hashing and Base36 encoding.
+</Note>
+
+## Security Features
+
+CUID2 provides multiple layers of security:
+
+1. **SHA3-512 Hashing** - Cryptographically secure hash function
+2. **Multiple Entropy Sources:**
+   - Current timestamp (milliseconds)
+   - Cryptographically secure random salt
+   - Monotonic counter (initialized randomly)
+   - Host fingerprint (derived from global environment)
+3. **Non-Predictable** - Hash output prevents ID enumeration attacks
+4. **Collision Resistant** - Combination of time, random, and counter ensures uniqueness
+
+```typescript
+import { cuid2 } from 'uniku/cuid2'
+
+// Even generated sequentially, IDs are non-predictable
+const ids = [cuid2(), cuid2(), cuid2()]
+// => [
+//   "pfh0haxfpzowht3oi213cqos",
+//   "qz8k3x9yt7lmvn6bj4hc5wde",
+//   "r2a7m1p5f8ghsj9kd3e6tcxw"
+// ]
+
+// No pattern can be used to predict the next ID
+```
+
+## Real-World Examples
+
+### API Tokens
+
+```typescript
+import { cuid2 } from 'uniku/cuid2'
+
+interface ApiToken {
+  id: string
+  userId: string
+  secret: string
+  createdAt: Date
+}
+
+function generateApiToken(userId: string): ApiToken {
+  return {
+    id: cuid2({ length: 16 }),
+    userId,
+    secret: cuid2({ length: 32 }), // Extra secure
+    createdAt: new Date()
+  }
+}
+```
+
+### Session IDs
+
+```typescript
+import { cuid2 } from 'uniku/cuid2'
+
+// Non-predictable session IDs prevent session fixation attacks
+const sessionId = cuid2()
+await redis.set(`session:${sessionId}`, JSON.stringify(userData), 'EX', 3600)
+```
+
+### Public Resource IDs
+
+```typescript
+import { cuid2 } from 'uniku/cuid2'
+
+// Prevent enumeration of resources in public-facing URLs
+interface Document {
+  id: string
+  title: string
+  content: string
+}
+
+function createDocument(title: string, content: string): Document {
+  return {
+    id: cuid2(), // Users can't guess other document IDs
+    title,
+    content
+  }
+}
+
+// Public URL: https://example.com/docs/pfh0haxfpzowht3oi213cqos
+```
+
+### Invite Codes
+
+```typescript
+import { cuid2 } from 'uniku/cuid2'
+
+// Generate short, secure invite codes
+const inviteCode = cuid2({ length: 8 })
+// => "k7m3p2n5"
+
+await db.insert('invites', {
+  code: inviteCode,
+  email: 'user@example.com',
+  expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+})
+```
+
+### Validation Example
+
+```typescript
+import { cuid2 } from 'uniku/cuid2'
+
+function processId(id: unknown) {
+  if (!cuid2.isValid(id)) {
+    throw new Error('Invalid ID format')
+  }
+  
+  // TypeScript now knows `id` is a string
+  console.log(id.length)
+  
+  return db.findById(id)
+}
+```
+
+### Testing with Deterministic Output
+
+```typescript
+import { cuid2 } from 'uniku/cuid2'
+
+// Provide custom random bytes for reproducible tests
+// Note: Fingerprint still uses CSPRNG for security
+const testId = cuid2({
+  length: 10,
+  random: new Uint8Array(16).fill(42)
+})
+
+// Mock Date.now() for fully deterministic output
+const originalDateNow = Date.now
+Date.now = () => 1702387456789
+
+const deterministicId = cuid2({
+  random: new Uint8Array(16).fill(0)
+})
+
+Date.now = originalDateNow
+```
+
+## Type Definitions
+
+```typescript
+type Cuid2Options = {
+  /**
+   * Length of the generated ID (2-32 characters).
+   * Default: 24
+   */
+  length?: number
+  /**
+   * Custom random bytes for deterministic testing.
+   * Must be at least 1 byte. For adequate entropy, use at least 16 bytes.
+   * Note: The fingerprint always uses cryptographically secure random bytes,
+   * regardless of this option.
+   */
+  random?: Uint8Array
+}
+
+type Cuid2 = {
+  (options?: Cuid2Options): string
+  isValid(id: unknown): id is string
+}
+```
+
+## Length Recommendations
+
+<CardGroup cols={2}>
+  <Card title="Short (8-12 chars)" icon="minimize">
+    Invite codes, short URLs, temporary tokens
+    
+    Lower entropy - only use for non-critical IDs
+  </Card>
+  <Card title="Default (24 chars)" icon="balance-scale">
+    Database IDs, resource identifiers, session IDs
+    
+    Good balance of security and readability
+  </Card>
+  <Card title="Long (28-32 chars)" icon="maximize">
+    API secrets, encryption keys, high-security tokens
+    
+    Maximum entropy - use for security-critical IDs
+  </Card>
+  <Card title="Minimum (2-7 chars)" icon="warning">
+    **Not recommended** - very high collision risk
+    
+    Only for testing or non-production use
+  </Card>
+</CardGroup>
+
+## Performance Characteristics
+
+<CardGroup cols={2}>
+  <Card title="Generation Speed" icon="bolt">
+    **8× faster** than `@paralleldrive/cuid2` npm package
+  </Card>
+  <Card title="Security" icon="shield">
+    SHA3-512 hashing prevents enumeration attacks
+  </Card>
+  <Card title="Collision Resistance" icon="lock">
+    Multiple entropy sources + hash function
+  </Card>
+  <Card title="Size" icon="chart-simple">
+    2-32 characters (configurable, default 24)
+  </Card>
+</CardGroup>
+
+<Info>
+**Bundle Size:** ~1.1 KB minified + gzipped (excluding SHA3-512 dependency)
+</Info>
+
+## Validation Pattern
+
+CUID2 must match this pattern:
+```regex
+/^[a-z][0-9a-z]+$/
+```
+
+Key characteristics:
+- First character is always `a-z` (lowercase letter)
+- Remaining characters are `0-9` or `a-z`
+- Length between 2 and 32 characters
+- Uses Base36 encoding (0-9, a-z)
+
+## Migration Guide
+
+### From `@paralleldrive/cuid2`
+
+```diff
+- import { createId } from '@paralleldrive/cuid2'
++ import { cuid2 } from 'uniku/cuid2'
+
+- const id = createId()
++ const id = cuid2()
+
+// Custom length
+- const init = createId({ length: 10 })
+- const shortId = init()
++ const shortId = cuid2({ length: 10 })
+```
+
+**Key differences:**
+- `uniku/cuid2` is a direct function call vs. `createId()` factory pattern
+- No need to initialize - just import and call `cuid2()`
+- **8× faster** performance
+
+### From UUID v4
+
+```diff
+- import { uuidv4 } from 'uniku/uuid/v4'
++ import { cuid2 } from 'uniku/cuid2'
+
+- const id = uuidv4()
++ const id = cuid2()
+```
+
+Benefit: Non-predictable IDs prevent enumeration attacks.
+
+<Tip>
+For time-ordered IDs that are still reasonably secure, consider [UUID v7](/generators/uuid-v7) or [ULID](/generators/ulid).
+</Tip>

@@ -1,0 +1,262 @@
+---
+title: "uuidv4"
+description: "Generate random UUID v4 identifiers with 122 bits of entropy"
+---
+
+# UUID v4
+
+Generate a UUID v4 string or write the bytes into a buffer.
+
+UUID v4 is a purely random UUID with 122 bits of entropy. It's the most widely compatible UUID format, supported by virtually all databases and systems. Use when you need maximum compatibility and don't require time-ordering.
+
+## Import
+
+```typescript
+import { uuidv4 } from 'uniku/uuid/v4'
+```
+
+## Function Signature
+
+```typescript
+type UuidV4 = {
+  (): string
+  <TBuf extends Uint8Array = Uint8Array>(options: UuidV4Options | undefined, buf: TBuf, offset?: number): TBuf
+  (options?: UuidV4Options, buf?: undefined, offset?: number): string
+  toBytes(id: string): Uint8Array
+  fromBytes(bytes: Uint8Array): string
+  isValid(id: unknown): id is string
+  NIL: string
+  MAX: string
+}
+```
+
+## Basic Usage
+
+<CodeGroup>
+```typescript Generate UUID v4
+const id = uuidv4()
+// => "550e8400-e29b-41d4-a716-446655440000"
+```
+
+```typescript Validate UUID v4
+if (uuidv4.isValid(id)) {
+  console.log('Valid UUID v4')
+}
+```
+
+```typescript Convert to bytes
+const bytes = uuidv4.toBytes(id)
+// => Uint8Array(16)
+
+const restored = uuidv4.fromBytes(bytes)
+// => "550e8400-e29b-41d4-a716-446655440000"
+```
+</CodeGroup>
+
+## Options
+
+<ParamField path="options" type="UuidV4Options" optional>
+  Configuration options for UUID generation
+</ParamField>
+
+<Expandable title="UuidV4Options">
+  <ParamField path="random" type="Uint8Array" optional>
+    16 bytes of random data to use for UUID generation.
+    
+    **Note:** Bytes at index 6 and 8 will be modified in-place to set version/variant bits.
+  </ParamField>
+</Expandable>
+
+## Buffer Mode
+
+Write UUID bytes directly to a buffer at a specific offset:
+
+<ParamField path="options" type="UuidV4Options | undefined" optional>
+  Configuration options (can be undefined)
+</ParamField>
+
+<ParamField path="buf" type="Uint8Array" required>
+  Target buffer to write the UUID bytes into (16 bytes required)
+</ParamField>
+
+<ParamField path="offset" type="number" optional default="0">
+  Byte offset in the buffer where UUID should be written
+</ParamField>
+
+<ResponseField name="return" type="Uint8Array">
+  Returns the same buffer instance that was passed in
+</ResponseField>
+
+```typescript
+const buffer = new Uint8Array(32)
+uuidv4(undefined, buffer, 8) // writes 16 bytes starting at offset 8
+```
+
+## Static Methods
+
+### toBytes()
+
+Convert a UUID string to a byte array.
+
+<ParamField path="id" type="string" required>
+  UUID v4 string in standard format (e.g., "550e8400-e29b-41d4-a716-446655440000")
+</ParamField>
+
+<ResponseField name="return" type="Uint8Array">
+  16-byte array representation of the UUID
+</ResponseField>
+
+```typescript
+const bytes = uuidv4.toBytes("550e8400-e29b-41d4-a716-446655440000")
+// => Uint8Array(16) [85, 14, 132, 0, 226, 155, 65, 212, 167, 22, 68, 102, 85, 68, 0, 0]
+```
+
+### fromBytes()
+
+Convert a byte array to a UUID string.
+
+<ParamField path="bytes" type="Uint8Array" required>
+  16-byte array representing a UUID
+</ParamField>
+
+<ResponseField name="return" type="string">
+  UUID v4 string in standard format with hyphens
+</ResponseField>
+
+```typescript
+const bytes = new Uint8Array([85, 14, 132, 0, 226, 155, 65, 212, 167, 22, 68, 102, 85, 68, 0, 0])
+const uuid = uuidv4.fromBytes(bytes)
+// => "550e8400-e29b-41d4-a716-446655440000"
+```
+
+### isValid()
+
+Validate whether a value is a valid UUID v4 string (type guard).
+
+<ParamField path="id" type="unknown" required>
+  Value to validate
+</ParamField>
+
+<ResponseField name="return" type="id is string">
+  Type predicate: `true` if the value is a valid UUID v4 string, `false` otherwise
+</ResponseField>
+
+```typescript
+const maybeUuid: unknown = getUserInput()
+
+if (uuidv4.isValid(maybeUuid)) {
+  // TypeScript now knows maybeUuid is a string
+  console.log(maybeUuid.toUpperCase())
+}
+```
+
+**Validation rules:**
+- Must be a string
+- Must match the pattern: `/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i`
+- Version bit (13th hex digit) must be `4`
+- Variant bits (17th hex digit) must be `8`, `9`, `a`, or `b`
+
+## Constants
+
+### NIL
+
+The nil UUID (all zeros).
+
+```typescript
+uuidv4.NIL
+// => "00000000-0000-0000-0000-000000000000"
+```
+
+### MAX
+
+The max UUID (all ones).
+
+```typescript
+uuidv4.MAX
+// => "ffffffff-ffff-ffff-ffff-ffffffffffff"
+```
+
+## Advanced Usage
+
+### Custom Random Source
+
+Provide your own random bytes for deterministic testing or custom entropy sources:
+
+```typescript
+const myRandomBytes = new Uint8Array(16)
+crypto.getRandomValues(myRandomBytes)
+
+const id = uuidv4({ random: myRandomBytes })
+```
+
+**Important:** The bytes at index 6 and 8 will be modified in-place to set the version and variant bits.
+
+### Write to Existing Buffer
+
+Efficiently write multiple UUIDs to a pre-allocated buffer:
+
+```typescript
+const buffer = new Uint8Array(64) // Space for 4 UUIDs
+
+uuidv4(undefined, buffer, 0)  // First UUID at offset 0
+uuidv4(undefined, buffer, 16) // Second UUID at offset 16
+uuidv4(undefined, buffer, 32) // Third UUID at offset 32
+uuidv4(undefined, buffer, 48) // Fourth UUID at offset 48
+```
+
+## Errors
+
+<ResponseField name="InvalidInputError" type="Error">
+  Thrown when random bytes array is too short (< 16 bytes)
+  
+  **Code:** `UUID_RANDOM_BYTES_TOO_SHORT`
+</ResponseField>
+
+<ResponseField name="BufferError" type="Error">
+  Thrown when buffer offset is out of bounds
+  
+  **Code:** `UUID_BUFFER_OUT_OF_BOUNDS`
+</ResponseField>
+
+<ResponseField name="ParseError" type="Error">
+  Thrown when parsing an invalid UUID string format
+</ResponseField>
+
+```typescript
+import { InvalidInputError, BufferError, ParseError } from 'uniku/uuid/v4'
+```
+
+## Type Definitions
+
+```typescript
+export type UuidV4Options = {
+  /**
+   * 16 bytes of random data to use for UUID generation.
+   * Note: Bytes at index 6 and 8 will be modified in-place to set version/variant bits.
+   */
+  random?: Uint8Array
+}
+
+export type UuidV4 = {
+  (): string
+  <TBuf extends Uint8Array = Uint8Array>(options: UuidV4Options | undefined, buf: TBuf, offset?: number): TBuf
+  (options?: UuidV4Options, buf?: undefined, offset?: number): string
+  toBytes(id: string): Uint8Array
+  fromBytes(bytes: Uint8Array): string
+  isValid(id: unknown): id is string
+  /** The nil UUID (all zeros) */
+  NIL: string
+  /** The max UUID (all ones) */
+  MAX: string
+}
+```
+
+## Performance
+
+When called without options, `uuidv4()` uses the native `crypto.randomUUID()` implementation for optimal performance.
+
+## See Also
+
+- [UUID v7](/api/uuidv7) - Time-ordered UUID with millisecond precision
+- [ULID](/api/ulid) - Lexicographically sortable alternative
+- [Nanoid](/api/nanoid) - Compact URL-friendly IDs

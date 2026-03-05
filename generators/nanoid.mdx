@@ -1,0 +1,385 @@
+---
+title: Nanoid
+description: Tiny, URL-friendly unique string ID generator with custom alphabets
+---
+
+# Nanoid
+
+Nanoid is a tiny, secure, URL-friendly unique string ID generator. It uses a URL-safe alphabet (A-Za-z0-9_-) and generates 21-character IDs by default with 126 bits of entropy - equivalent to UUID collision resistance but in a more compact format.
+
+## When to Use
+
+Use Nanoid when you need:
+- **URL-safe IDs** - No special characters, ready for URLs
+- **Compact format** - 21 characters vs UUID's 36
+- **Custom alphabets** - Generate hex, numeric, or custom character sets
+- **High entropy** - 126 bits of randomness (comparable to UUID)
+
+<Warning>
+Nanoid is **NOT time-ordered**. For sortable IDs, use [UUID v7](/generators/uuid-v7) or [ULID](/generators/ulid) instead.
+</Warning>
+
+## Basic Usage
+
+```typescript
+import { nanoid } from 'uniku/nanoid'
+
+const id = nanoid()
+// => "V1StGXR8_Z5jdHi6B-myT"
+
+// Custom size
+const shortId = nanoid(10)
+// => "IRFa-VaY2b"
+```
+
+## API Reference
+
+### Main Function
+
+<ParamField path="nanoid()" type="() => string">
+  Generate a 21-character nanoid using the default URL-safe alphabet.
+  
+  **Ultra-fast path** - uses simple random byte pooling for best performance.
+</ParamField>
+
+<ParamField path="nanoid(size)" type="(size: number) => string">
+  Generate a nanoid of custom length using the default URL-safe alphabet.
+  
+  **Parameters:**
+  - `size` - Length of generated ID (0-2048, default: 21)
+</ParamField>
+
+<ParamField path="nanoid(options)" type="(options: NanoidOptions) => string">
+  Generate a nanoid with custom options.
+  
+  **Options:**
+  - `size?: number` - ID length (0-2048, default: 21)
+  - `alphabet?: string` - Custom alphabet (2-256 printable ASCII characters)
+  - `random?: Uint8Array` - Custom random bytes for deterministic testing
+</ParamField>
+
+### Static Methods
+
+<ParamField path="nanoid.isValid(id)" type="(id: unknown) => id is string">
+  Validate that a value is a properly formatted nanoid string. TypeScript type guard.
+  
+  **Important:** Only validates IDs against the **default URL-safe alphabet** (`A-Za-z0-9_-`). IDs generated with custom alphabets cannot be validated with this method.
+  
+  ```typescript
+  nanoid.isValid("V1StGXR8_Z5jdHi6B-myT") // true
+  nanoid.isValid("not-a-nanoid!") // false
+  ```
+</ParamField>
+
+### Constants
+
+<ParamField path="URL_ALPHABET" type="string">
+  The default URL-safe alphabet: `"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"`
+  
+  ```typescript
+  import { URL_ALPHABET } from 'uniku/nanoid'
+  console.log(URL_ALPHABET.length) // 64
+  ```
+</ParamField>
+
+<Note>
+**No Binary Conversion:** Unlike UUID and ULID, nanoid does not provide `toBytes`/`fromBytes` methods because it is a string-native format with no canonical binary representation.
+</Note>
+
+## Custom Alphabets
+
+Nanoid supports custom alphabets for specialized use cases:
+
+### Hexadecimal IDs
+
+```typescript
+import { nanoid } from 'uniku/nanoid'
+
+const hexId = nanoid({
+  alphabet: '0123456789abcdef',
+  size: 12
+})
+// => "4f90d13a42bc"
+```
+
+### Numeric-Only IDs
+
+```typescript
+import { nanoid } from 'uniku/nanoid'
+
+const numericId = nanoid({
+  alphabet: '0123456789',
+  size: 10
+})
+// => "8234567901"
+```
+
+### Lowercase Only
+
+```typescript
+import { nanoid } from 'uniku/nanoid'
+
+const lowerCaseId = nanoid({
+  alphabet: 'abcdefghijklmnopqrstuvwxyz',
+  size: 16
+})
+// => "kpqrnwxyzabcdefg"
+```
+
+### Custom Characters
+
+```typescript
+import { nanoid } from 'uniku/nanoid'
+
+// Using emoji (for fun - not recommended for production)
+const emojiId = nanoid({
+  alphabet: '😀😃😄😁😆😅😂🤣',
+  size: 8
+})
+// Note: Multi-byte characters work but increase size
+```
+
+<Warning>
+**Alphabet Requirements:**
+- Must contain 2-256 characters
+- Only printable ASCII characters (codes 32-126)
+- No duplicate characters
+- Power-of-2 lengths (2, 4, 8, 16, 32, 64, 128, 256) are fastest - no rejection sampling needed
+</Warning>
+
+## Real-World Examples
+
+### URL Shortener
+
+```typescript
+import { nanoid } from 'uniku/nanoid'
+
+interface ShortUrl {
+  id: string
+  originalUrl: string
+  createdAt: Date
+}
+
+function shortenUrl(originalUrl: string): ShortUrl {
+  return {
+    id: nanoid(8), // 8 characters = ~47 bits of entropy
+    originalUrl,
+    createdAt: new Date()
+  }
+}
+
+// Usage: https://example.com/s/IRFa-VaY
+```
+
+### Session Tokens
+
+```typescript
+import { nanoid } from 'uniku/nanoid'
+
+// Generate secure session tokens
+const sessionToken = nanoid(32) // Extra security with 32 characters
+// => "V1StGXR8_Z5jdHi6B-myT9fK3nL7pQ8"
+
+await redis.set(`session:${sessionToken}`, userId, 'EX', 3600)
+```
+
+### Invite Codes
+
+```typescript
+import { nanoid } from 'uniku/nanoid'
+
+// Generate readable invite codes (uppercase + numbers only)
+const inviteCode = nanoid({
+  alphabet: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+  size: 8
+})
+// => "K7M3P2N5"
+
+await db.insert('invites', {
+  code: inviteCode,
+  email: 'user@example.com'
+})
+```
+
+### File Upload IDs
+
+```typescript
+import { nanoid } from 'uniku/nanoid'
+
+async function uploadFile(file: File) {
+  const fileId = nanoid()
+  const extension = file.name.split('.').pop()
+  const filename = `${fileId}.${extension}`
+  
+  await s3.upload({
+    Key: `uploads/${filename}`,
+    Body: file
+  })
+  
+  return `https://cdn.example.com/uploads/${filename}`
+}
+```
+
+### Correlation IDs
+
+```typescript
+import { nanoid } from 'uniku/nanoid'
+
+app.use((req, res, next) => {
+  // Short correlation ID for logs
+  req.correlationId = nanoid(10)
+  res.setHeader('X-Correlation-ID', req.correlationId)
+  next()
+})
+
+app.get('/api/users', (req, res) => {
+  logger.info('Fetching users', { correlationId: req.correlationId })
+  // ...
+})
+```
+
+### Testing with Deterministic Output
+
+```typescript
+import { nanoid } from 'uniku/nanoid'
+
+// Provide custom random bytes for reproducible tests
+const testId = nanoid({
+  size: 10,
+  random: new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+})
+// => "ABCDEFGHIJKmnop" (deterministic for testing)
+```
+
+## Type Definitions
+
+```typescript
+type NanoidOptions = {
+  /**
+   * Random bytes for deterministic output (testing).
+   * For power-of-2 alphabets (2, 4, 8, 16, 32, 64, 128, 256): 
+   * exactly `size` bytes needed.
+   * For other alphabets: ~size * 2 bytes needed (rejection sampling).
+   */
+  random?: Uint8Array
+  /**
+   * Custom alphabet to use. Default: URL-safe A-Za-z0-9_-
+   * Must be 2-256 printable ASCII characters (32-126) with no duplicates.
+   */
+  alphabet?: string
+  /**
+   * Length of generated ID. Default: 21. Maximum: 2048.
+   */
+  size?: number
+}
+
+type Nanoid = {
+  /** Generate nanoid with default settings */
+  (): string
+  /** Generate nanoid with custom size */
+  (size: number): string
+  /** Generate nanoid with options */
+  (options: NanoidOptions): string
+  /**
+   * Validate a nanoid string against the default URL-safe alphabet.
+   * Note: Does not validate IDs generated with custom alphabets.
+   */
+  isValid(id: unknown): id is string
+}
+```
+
+## Alphabet Performance
+
+<CardGroup cols={2}>
+  <Card title="Power-of-2 Alphabets" icon="rocket">
+    **Fastest** - Direct byte mapping, no rejection
+    
+    Examples: 2, 4, 8, 16, 32, 64, 128, 256 characters
+  </Card>
+  <Card title="Non-Power-of-2" icon="hourglass">
+    **Slower** - Uses rejection sampling
+    
+    Examples: 10 (numeric), 26 (lowercase), 36 (alphanumeric)
+  </Card>
+</CardGroup>
+
+The default 64-character URL-safe alphabet is optimized (power-of-2) for maximum performance.
+
+## Collision Probability
+
+**Default 21 characters:**
+- ~126 bits of entropy
+- Need ~2^63 IDs for 1% collision probability
+- Similar to UUID v4 (122 bits)
+
+**Size recommendations:**
+- **8 chars** (~47 bits): URL shorteners, temporary IDs
+- **10 chars** (~59 bits): Session tokens, invite codes
+- **21 chars** (default, ~126 bits): General purpose, high security
+- **32 chars** (~189 bits): Maximum security, cryptographic use
+
+<Tip>
+Use [Nano ID Collision Calculator](https://zelark.github.io/nano-id-cc/) to estimate collision probability for your use case.
+</Tip>
+
+## Performance Characteristics
+
+<CardGroup cols={2}>
+  <Card title="Generation Speed" icon="bolt">
+    **Comparable** to `nanoid` npm package (both use optimized pooling)
+  </Card>
+  <Card title="Size" icon="minimize">
+    42% shorter than UUID (21 vs 36 characters)
+  </Card>
+  <Card title="Entropy" icon="shield">
+    126 bits (default) - same collision resistance as UUID
+  </Card>
+  <Card title="URL-Safe" icon="link">
+    No special encoding needed in URLs
+  </Card>
+</CardGroup>
+
+<Info>
+**Bundle Size:** ~938 bytes minified + gzipped
+</Info>
+
+## Validation Pattern
+
+**Default alphabet** nanoid must match:
+```regex
+/^[A-Za-z0-9_-]+$/
+```
+
+Key characteristics:
+- Only contains `A-Z`, `a-z`, `0-9`, `_`, and `-`
+- Any length > 0
+- Custom alphabet validation not supported
+
+## Migration Guide
+
+### From `nanoid` Package
+
+```diff
+- import { nanoid } from 'nanoid'
++ import { nanoid } from 'uniku/nanoid'
+
+  const id = nanoid()
+```
+
+API is identical - drop-in replacement.
+
+### From `shortid` Package
+
+```diff
+- import shortid from 'shortid'
++ import { nanoid } from 'uniku/nanoid'
+
+- const id = shortid.generate()
++ const id = nanoid(10) // shortid default is ~10 chars
+```
+
+Benefit: Cryptographically secure, no deprecated dependencies.
+
+<Tip>
+For time-ordered IDs that maintain chronological sorting, consider [ULID](/generators/ulid) or [UUID v7](/generators/uuid-v7).
+</Tip>

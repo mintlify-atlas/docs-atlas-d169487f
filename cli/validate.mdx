@@ -1,0 +1,314 @@
+---
+title: Validate IDs
+description: Validate unique identifiers with automatic type detection and batch processing
+---
+
+The `validate` command checks if an ID is valid and optionally identifies its type. It supports single ID validation, batch processing from stdin, and multiple output formats.
+
+## Basic Usage
+
+Validate a single ID with automatic type detection:
+
+```bash
+uniku validate 018e5e5c-7c8a-7000-8000-000000000000
+# => Valid UUID
+
+uniku validate 01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+# => Valid ULID
+
+uniku validate invalid-id
+# => Invalid ID
+# (exits with code 2)
+```
+
+The CLI automatically detects the ID type and validates against the appropriate format.
+
+## Explicit Type Validation
+
+Specify the expected ID type using `--type`:
+
+```bash
+# Validate as UUID
+uniku validate --type uuid 550e8400-e29b-41d4-a716-446655440000
+# => Valid UUID
+
+# Validate as ULID
+uniku validate --type ulid 01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+# => Valid ULID
+
+# Type mismatch
+uniku validate --type uuid 01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+# => Invalid UUID
+```
+
+<ParamField path="--type" type="uuid | ulid | nanoid | cuid | ksuid">
+  Expected ID type. If omitted, type is auto-detected.
+  
+  ```bash
+  uniku validate --type ulid 01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+  ```
+</ParamField>
+
+<Info>
+Auto-detection works by testing the ID format against all known patterns. Explicit type checking is faster and more precise.
+</Info>
+
+## Batch Validation
+
+Validate multiple IDs from stdin using `--stdin`:
+
+```bash
+# From a file
+cat ids.txt | uniku validate --stdin
+
+# From echo
+echo -e "018e5e5c-7c8a-7000-8000-000000000000\n01HW9T2W9W9YJ3JZ1H4P4M2T8Q" | uniku validate --stdin
+
+# From command output
+uniku uuid --count 5 | uniku validate --stdin
+```
+
+<ParamField path="--stdin" type="boolean" default="false">
+  Read IDs from stdin, one per line
+  
+  ```bash
+  cat ids.txt | uniku validate --stdin
+  ```
+</ParamField>
+
+### Example: Batch Validation
+
+Create a file with multiple IDs:
+
+```bash
+cat > ids.txt <<EOF
+018e5e5c-7c8a-7000-8000-000000000000
+01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+V1StGXR8_Z5jdHi6B-myT
+invalid-id
+EOF
+
+# Validate all IDs
+cat ids.txt | uniku validate --stdin
+```
+
+Output:
+```
+018e5e5c-7c8a-7000-8000-000000000000: Valid UUID
+01HW9T2W9W9YJ3JZ1H4P4M2T8Q: Valid ULID
+V1StGXR8_Z5jdHi6B-myT: Valid Nanoid
+invalid-id: Invalid ID
+```
+
+The command exits with code `2` if any ID is invalid.
+
+<Warning>
+When using `--stdin`, the command fails if **any** ID is invalid. Use `--json` or `--quiet` for programmatic error handling.
+</Warning>
+
+## Quiet Mode
+
+Use `--quiet` for silent validation with exit codes only:
+
+```bash
+# Valid ID (exits with 0)
+uniku validate --quiet 018e5e5c-7c8a-7000-8000-000000000000
+echo $?  # => 0
+
+# Invalid ID (exits with 2)
+uniku validate --quiet invalid-id
+echo $?  # => 2
+```
+
+<ParamField path="--quiet" type="boolean" default="false">
+  No output, exit code only
+  
+  - `0` — ID is valid
+  - `2` — ID is invalid
+  
+  ```bash
+  uniku validate --quiet 01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+  ```
+</ParamField>
+
+This is useful in shell scripts:
+
+```bash
+if uniku validate --quiet "$ID"; then
+  echo "Valid ID"
+else
+  echo "Invalid ID"
+  exit 1
+fi
+```
+
+## JSON Output
+
+Get structured validation results with `--json`:
+
+```bash
+uniku validate --json 018e5e5c-7c8a-7000-8000-000000000000
+```
+
+```json
+{
+  "id": "018e5e5c-7c8a-7000-8000-000000000000",
+  "valid": true,
+  "type": "uuid"
+}
+```
+
+For invalid IDs:
+
+```bash
+uniku validate --json invalid-id
+```
+
+```json
+{
+  "id": "invalid-id",
+  "valid": false,
+  "type": null
+}
+```
+
+<ParamField path="--json" type="boolean" default="false">
+  Output validation results as JSON
+  
+  ```bash
+  uniku validate --json 01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+  ```
+</ParamField>
+
+### Batch JSON Output
+
+Combine `--stdin` and `--json` for structured batch results:
+
+```bash
+echo -e "018e5e5c-7c8a-7000-8000-000000000000\ninvalid-id" | uniku validate --stdin --json
+```
+
+```json
+[
+  {
+    "id": "018e5e5c-7c8a-7000-8000-000000000000",
+    "valid": true,
+    "type": "uuid"
+  },
+  {
+    "id": "invalid-id",
+    "valid": false,
+    "type": null
+  }
+]
+```
+
+Parse with `jq`:
+
+```bash
+# Count valid IDs
+cat ids.txt | uniku validate --stdin --json | jq '[.[] | select(.valid)] | length'
+
+# Extract invalid IDs
+cat ids.txt | uniku validate --stdin --json | jq -r '.[] | select(.valid == false) | .id'
+```
+
+## Exit Codes
+
+The `validate` command uses these exit codes:
+
+| Code | Meaning |
+|------|----------|
+| `0`  | All IDs are valid |
+| `1`  | Command error (missing input, invalid arguments) |
+| `2`  | One or more IDs are invalid |
+
+Example usage:
+
+```bash
+if uniku validate "$ID"; then
+  echo "Proceeding with valid ID"
+else
+  CODE=$?
+  if [ $CODE -eq 2 ]; then
+    echo "Invalid ID format"
+  else
+    echo "Validation error"
+  fi
+  exit $CODE
+fi
+```
+
+## Examples
+
+### Pipeline Validation
+
+Validate IDs generated in a pipeline:
+
+```bash
+# Generate and validate
+uniku uuid --version 7 --count 10 | uniku validate --stdin
+
+# Generate, validate, and inspect
+uniku ulid --count 5 | tee ids.txt | uniku validate --stdin
+```
+
+### Filter Valid IDs
+
+Use jq to filter valid IDs from batch validation:
+
+```bash
+cat ids.txt | uniku validate --stdin --json | jq -r '.[] | select(.valid) | .id'
+```
+
+### Validation in CI/CD
+
+Validate IDs in a CI pipeline:
+
+```bash
+#!/bin/bash
+set -e
+
+# Validate required ID
+if ! uniku validate --quiet --type uuid "$UUID"; then
+  echo "Error: Invalid UUID in environment variable"
+  exit 1
+fi
+
+echo "UUID validation passed"
+```
+
+### Type Detection Report
+
+Generate a report of ID types:
+
+```bash
+cat mixed_ids.txt | uniku validate --stdin --json | jq -r '.[] | "\(.id): \(.type // "unknown")"'
+```
+
+## Supported ID Types
+
+The validator supports these ID formats:
+
+| Type | Format | Example |
+|------|--------|--------|
+| UUID | 8-4-4-4-12 hex with hyphens | `550e8400-e29b-41d4-a716-446655440000` |
+| ULID | 26 characters, Crockford base32 | `01HW9T2W9W9YJ3JZ1H4P4M2T8Q` |
+| Nanoid | Configurable length, URL-safe | `V1StGXR8_Z5jdHi6B-myT` |
+| CUID2 | 2-32 characters, starts with letter | `clhw9t2w9w9yj3jz1h4p4m2t` |
+| KSUID | 27 characters, base62 | `2HbcvN9VFGzP8jR5mK3QxW4d` |
+
+<Tip>
+Auto-detection is pattern-based. For ambiguous formats (like Nanoid), use `--type` to ensure correct validation.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Generate IDs" icon="sparkles" href="/cli/generate">
+    Generate IDs to validate
+  </Card>
+  <Card title="Inspect IDs" icon="magnifying-glass" href="/cli/inspect">
+    Extract metadata from valid IDs
+  </Card>
+</CardGroup>

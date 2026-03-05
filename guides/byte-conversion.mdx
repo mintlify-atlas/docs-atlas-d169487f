@@ -1,0 +1,461 @@
+---
+title: Byte Conversion
+description: Working with binary representations of IDs using toBytes and fromBytes
+---
+
+Many ID formats have canonical binary representations that are more efficient for storage and network transmission. Uniku provides `toBytes()` and `fromBytes()` for converting between string and binary formats.
+
+## Which Formats Support Bytes?
+
+| Format | Binary Support | Size | Notes |
+|--------|:--------------:|------|-------|
+| **UUID v4** | ✅ | 16 bytes | RFC 4122 standard format |
+| **UUID v7** | ✅ | 16 bytes | RFC 9562 standard format |
+| **ULID** | ✅ | 16 bytes | 48-bit timestamp + 80-bit random |
+| **KSUID** | ✅ | 20 bytes | 32-bit timestamp + 128-bit random |
+| **CUID2** | ❌ | N/A | String-native, no canonical binary format |
+| **Nanoid** | ❌ | N/A | String-native, no canonical binary format |
+
+<Note>
+**Why don't CUID2 and Nanoid have byte conversion?**
+
+CUID2 and Nanoid are string-native formats with variable-length, Base36/Base64 encoding. They don't have a standardized binary representation. You could convert the string to UTF-8 bytes, but that's just storing the string representation.
+</Note>
+
+## Basic Usage
+
+### UUID v4
+
+```typescript
+import { uuidv4 } from 'uniku/uuid/v4'
+
+// Generate a UUID string
+const id = uuidv4()
+// => "550e8400-e29b-41d4-a716-446655440000"
+
+// Convert to bytes (16 bytes)
+const bytes = uuidv4.toBytes(id)
+// => Uint8Array(16) [ 85, 14, 132, 0, 226, 155, ... ]
+
+// Convert back to string
+const restored = uuidv4.fromBytes(bytes)
+// => "550e8400-e29b-41d4-a716-446655440000"
+
+console.log(id === restored) // true
+```
+
+### UUID v7
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+const id = uuidv7()
+// => "018e5e5c-7c8a-7000-8000-000000000000"
+
+const bytes = uuidv7.toBytes(id)
+// => Uint8Array(16)
+
+const restored = uuidv7.fromBytes(bytes)
+// => "018e5e5c-7c8a-7000-8000-000000000000"
+```
+
+### ULID
+
+```typescript
+import { ulid } from 'uniku/ulid'
+
+const id = ulid()
+// => "01HW9T2W9W9YJ3JZ1H4P4M2T8Q"
+
+const bytes = ulid.toBytes(id)
+// => Uint8Array(16)
+
+const restored = ulid.fromBytes(bytes)
+// => "01HW9T2W9W9YJ3JZ1H4P4M2T8Q"
+```
+
+### KSUID
+
+```typescript
+import { ksuid } from 'uniku/ksuid'
+
+const id = ksuid()
+// => "2QnJjKLvpSfpZqGiPPxVwWLMy2p"
+
+const bytes = ksuid.toBytes(id)
+// => Uint8Array(20) // Note: KSUID is 20 bytes, not 16
+
+const restored = ksuid.fromBytes(bytes)
+// => "2QnJjKLvpSfpZqGiPPxVwWLMy2p"
+```
+
+<Info>
+KSUID uses 20 bytes (160 bits) instead of 16 bytes like UUID/ULID. This provides more entropy in the random portion.
+</Info>
+
+## Use Cases for Byte Conversion
+
+### 1. Database Storage
+
+Store IDs as binary for more efficient storage and indexing:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+// PostgreSQL example with binary UUID storage
+const id = uuidv7()
+const bytes = uuidv7.toBytes(id)
+
+// Store as BYTEA (more compact than TEXT)
+await db.query(
+  'INSERT INTO users (id, name) VALUES ($1, $2)',
+  [bytes, 'Alice']
+)
+
+// Retrieve and convert back
+const result = await db.query('SELECT id FROM users WHERE name = $1', ['Alice'])
+const storedId = uuidv7.fromBytes(result.rows[0].id)
+```
+
+**Storage savings:**
+- UUID string: 36 bytes (with dashes) or 32 bytes (without)
+- UUID binary: 16 bytes
+- **Savings: 50-55% reduction**
+
+### 2. Network Transmission
+
+Send IDs in binary format to reduce payload size:
+
+```typescript
+import { ulid } from 'uniku/ulid'
+
+// API endpoint
+app.post('/batch', async (req, res) => {
+  // Generate 1000 IDs
+  const ids = Array.from({ length: 1000 }, () => ulid())
+  
+  // Convert to binary for transmission
+  const binaryPayload = new Uint8Array(ids.length * 16)
+  for (let i = 0; i < ids.length; i++) {
+    const bytes = ulid.toBytes(ids[i])
+    binaryPayload.set(bytes, i * 16)
+  }
+  
+  // Send binary data (16 KB instead of 26 KB)
+  res.send(binaryPayload)
+})
+```
+
+**Bandwidth savings:**
+- 1000 ULIDs as strings: 26,000 bytes (~25 KB)
+- 1000 ULIDs as bytes: 16,000 bytes (~15.6 KB)
+- **Savings: 38% reduction**
+
+### 3. Efficient Comparisons
+
+Binary comparison can be faster than string comparison:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+const id1 = uuidv7()
+const id2 = uuidv7()
+
+// String comparison
+const isEqual = id1 === id2 // Compare 36 characters
+
+// Binary comparison (potentially faster for large batches)
+const bytes1 = uuidv7.toBytes(id1)
+const bytes2 = uuidv7.toBytes(id2)
+const isEqualBinary = bytes1.every((byte, i) => byte === bytes2[i]) // Compare 16 bytes
+```
+
+<Tip>
+For single comparisons, string comparison is fine. Binary comparison helps when processing thousands of IDs in tight loops.
+</Tip>
+
+### 4. Indexed Databases and Key-Value Stores
+
+Many databases support binary keys:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+// LevelDB / RocksDB example
+const db = level('./mydb', { valueEncoding: 'json' })
+
+const userId = uuidv7()
+const userBytes = uuidv7.toBytes(userId)
+
+// Use binary key for more efficient indexing
+await db.put(userBytes, {
+  name: 'Alice',
+  email: 'alice@example.com'
+})
+
+// Retrieve by binary key
+const user = await db.get(userBytes)
+```
+
+## Writing to Buffers with Offsets
+
+For maximum performance, write directly to a pre-allocated buffer:
+
+### Basic Buffer Writing
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+// Allocate buffer
+const buffer = new Uint8Array(32)
+
+// Write first UUID at offset 0
+uuidv7(undefined, buffer, 0)
+
+// Write second UUID at offset 16
+uuidv7(undefined, buffer, 16)
+
+// Now buffer contains two UUIDs (32 bytes total)
+```
+
+### Batch Generation
+
+```typescript
+import { ulid } from 'uniku/ulid'
+
+// Generate 100 ULIDs into a single buffer
+function generateBatch(count: number): Uint8Array {
+  const buffer = new Uint8Array(count * 16)
+  
+  for (let i = 0; i < count; i++) {
+    ulid(undefined, buffer, i * 16)
+  }
+  
+  return buffer
+}
+
+const batchBytes = generateBatch(100)
+// => Uint8Array(1600) containing 100 ULIDs
+```
+
+### Mixed Data Structures
+
+Combine IDs with other binary data:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+// Message format: [UUID (16 bytes)] + [timestamp (8 bytes)] + [data length (4 bytes)]
+function createMessage(data: Uint8Array): Uint8Array {
+  const message = new Uint8Array(16 + 8 + 4 + data.length)
+  
+  // Write UUID at offset 0
+  uuidv7(undefined, message, 0)
+  
+  // Write timestamp at offset 16
+  const timestamp = BigInt(Date.now())
+  new DataView(message.buffer).setBigUint64(16, timestamp, false)
+  
+  // Write data length at offset 24
+  new DataView(message.buffer).setUint32(24, data.length, false)
+  
+  // Write data at offset 28
+  message.set(data, 28)
+  
+  return message
+}
+
+const msg = createMessage(new TextEncoder().encode('Hello'))
+// Extract UUID later
+const msgId = uuidv7.fromBytes(msg.subarray(0, 16))
+```
+
+<Warning>
+**Offset bounds checking:** Uniku will throw a `BufferError` if your offset would write beyond the buffer bounds. Always ensure your buffer is large enough:
+
+- UUID/ULID: 16 bytes
+- KSUID: 20 bytes
+</Warning>
+
+## Advanced: Custom Random Bytes
+
+You can provide custom random bytes and write to a buffer simultaneously:
+
+```typescript
+import { uuidv4 } from 'uniku/uuid/v4'
+
+const customRandom = new Uint8Array(16)
+crypto.getRandomValues(customRandom)
+
+const buffer = new Uint8Array(32)
+
+// Generate UUID with custom random bytes, write to buffer at offset 8
+uuidv4({ random: customRandom }, buffer, 8)
+
+// Note: customRandom is modified in-place for version/variant bits
+```
+
+<Note>
+**Important:** For UUID v4, bytes at index 6 and 8 of the random array are modified in-place to set the version and variant bits. If you need to preserve the original random bytes, make a copy first.
+</Note>
+
+## Binary Format Details
+
+### UUID Binary Layout (16 bytes)
+
+```
+Byte offset:  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+             [  time_high  ][ver][ time_low ][var][    random    ]
+             
+UUID v4:     [        all random (122 bits)        ][ver][var]
+UUID v7:     [  timestamp (48 bits) ][ver][seq + random (74 bits)][var]
+```
+
+### ULID Binary Layout (16 bytes)
+
+```
+Byte offset:  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+             [  timestamp (48 bits) ][      random (80 bits)      ]
+```
+
+### KSUID Binary Layout (20 bytes)
+
+```
+Byte offset:  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19
+             [timestamp(32)][          random payload (128 bits)          ]
+```
+
+## Performance Considerations
+
+### String vs Bytes
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+// Generating 10,000 IDs
+const iterations = 10_000
+
+// String generation
+const start1 = performance.now()
+for (let i = 0; i < iterations; i++) {
+  const id = uuidv7() // Returns string
+}
+const end1 = performance.now()
+
+// Byte generation (pre-allocated buffer)
+const buffer = new Uint8Array(16)
+const start2 = performance.now()
+for (let i = 0; i < iterations; i++) {
+  uuidv7(undefined, buffer, 0) // Writes to buffer
+}
+const end2 = performance.now()
+
+console.log(`String: ${end1 - start1}ms`)
+console.log(`Bytes: ${end2 - start2}ms`)
+// Bytes is typically faster (no string formatting)
+```
+
+<Tip>
+**When to use bytes:**
+- Storing in binary databases
+- Network transmission
+- High-performance batch operations
+
+**When to use strings:**
+- Human-readable logs
+- JSON APIs
+- URLs and file names
+</Tip>
+
+## Database Examples
+
+### PostgreSQL with Binary UUIDs
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+import { Pool } from 'pg'
+
+const pool = new Pool()
+
+// Create table with UUID type
+await pool.query(`
+  CREATE TABLE users (
+    id UUID PRIMARY KEY,
+    name TEXT NOT NULL
+  )
+`)
+
+// Insert using binary
+const id = uuidv7()
+const bytes = uuidv7.toBytes(id)
+
+await pool.query(
+  'INSERT INTO users (id, name) VALUES ($1, $2)',
+  [bytes, 'Alice']
+)
+
+// Query using string (Postgres handles conversion)
+const result = await pool.query(
+  'SELECT id FROM users WHERE id = $1',
+  [id] // Can use string
+)
+```
+
+### SQLite with BLOB Storage
+
+```typescript
+import { ulid } from 'uniku/ulid'
+import Database from 'better-sqlite3'
+
+const db = new Database('app.db')
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS records (
+    id BLOB PRIMARY KEY,
+    data TEXT
+  )
+`)
+
+const insert = db.prepare('INSERT INTO records (id, data) VALUES (?, ?)')
+
+const id = ulid()
+const bytes = ulid.toBytes(id)
+
+insert.run(bytes, 'some data')
+
+// Query
+const select = db.prepare('SELECT id, data FROM records WHERE id = ?')
+const row = select.get(bytes)
+const retrievedId = ulid.fromBytes(row.id)
+```
+
+## Summary
+
+<Accordion title="Byte Conversion Checklist">
+
+**Supported formats:**
+- ✅ UUID v4 (16 bytes)
+- ✅ UUID v7 (16 bytes)
+- ✅ ULID (16 bytes)
+- ✅ KSUID (20 bytes)
+- ❌ CUID2 (no binary format)
+- ❌ Nanoid (no binary format)
+
+**Best practices:**
+- Use `toBytes()` for database storage (50%+ size savings)
+- Use `fromBytes()` when retrieving from binary storage
+- Write directly to buffers for batch operations
+- Reuse buffers for maximum performance
+- Use binary format for network transmission
+
+**When to use strings:**
+- JSON APIs
+- Human-readable logs
+- URLs and file names
+- When interoperability matters
+
+</Accordion>
+
+<Note>
+For most applications, the convenience of strings outweighs the storage/performance benefits of bytes. Use binary formats when you have specific optimization needs.
+</Note>

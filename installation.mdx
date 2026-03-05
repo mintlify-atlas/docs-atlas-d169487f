@@ -1,0 +1,173 @@
+---
+title: Installation
+description: Install uniku in your project with your preferred package manager.
+---
+
+## Package Managers
+
+Install uniku using your preferred package manager:
+
+<CodeGroup>
+```bash pnpm
+pnpm add uniku
+```
+
+```bash npm
+npm install uniku
+```
+
+```bash bun
+bun add uniku
+```
+
+```bash yarn
+yarn add uniku
+```
+
+```bash deno
+deno install npm:uniku
+```
+</CodeGroup>
+
+<Info>
+**pnpm** is the recommended package manager for optimal performance and disk space usage.
+</Info>
+
+## Requirements
+
+uniku requires a JavaScript runtime that supports:
+
+- **ESM modules** (no CommonJS support)
+- **Web Crypto API** (`globalThis.crypto`)
+- **Node.js** v24.13.0 or higher (if using Node.js)
+
+<Warning>
+uniku is **ESM-only**. Make sure your `package.json` has `"type": "module"` or use `.mjs` file extensions.
+</Warning>
+
+## Bundle Size
+
+Only import what you use — each entry point is independently tree-shakeable:
+
+| Import | Minified + gzipped |
+|--------|-------------------:|
+| `uniku/uuid/v4` | ~940 B |
+| `uniku/uuid/v7` | ~1.1 KB |
+| `uniku/ulid` | ~1.5 KB |
+| `uniku/cuid2` | ~1.1 KB |
+| `uniku/nanoid` | ~938 B |
+| `uniku/ksuid` | ~1.0 KB |
+
+<Tip>
+Thanks to separate entry points, your bundle only includes the ID generators you actually import. No barrel exports means perfect tree-shaking.
+</Tip>
+
+### Example Bundle Impact
+
+If you only import UUID v7:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+```
+
+Your bundle will increase by **~1.1 KB** (minified + gzipped), regardless of how many other formats uniku supports.
+
+## Runtime Compatibility
+
+uniku works in all JavaScript environments that support the Web Crypto API:
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    Version 24.13.0 or higher
+  </Card>
+  
+  <Card title="Deno" icon="deno">
+    All versions with Web Crypto support
+  </Card>
+  
+  <Card title="Bun" icon="bun">
+    All versions
+  </Card>
+  
+  <Card title="Cloudflare Workers" icon="cloudflare">
+    All versions
+  </Card>
+  
+  <Card title="Vercel Edge" icon="vercel">
+    All versions
+  </Card>
+  
+  <Card title="Browsers" icon="chrome">
+    All modern browsers (Chrome, Firefox, Safari, Edge)
+  </Card>
+</CardGroup>
+
+<Note>
+No Node.js-specific APIs are used. uniku relies entirely on `globalThis.crypto`, making it truly universal.
+</Note>
+
+## Preview Releases
+
+Every pull request gets a preview release via [pkg.pr.new](https://pkg.pr.new). You can install directly from a PR to test unreleased features:
+
+<CodeGroup>
+```bash pnpm
+pnpm add https://pkg.pr.new/jkomyno/uniku@123
+```
+
+```bash npm
+npm install https://pkg.pr.new/jkomyno/uniku@123
+```
+
+```bash bun
+bun add https://pkg.pr.new/jkomyno/uniku@123
+```
+</CodeGroup>
+
+Replace `123` with the actual PR number.
+
+<Warning>
+Preview releases are for testing only. Do not use them in production.
+</Warning>
+
+## TypeScript Support
+
+uniku is written in TypeScript and includes full type definitions. No additional `@types` packages are needed.
+
+```typescript
+import { uuidv7, type UuidV7Options } from 'uniku/uuid/v7'
+
+// Full TypeScript support with type inference
+const id: string = uuidv7()
+
+// Options are fully typed
+const options: UuidV7Options = {
+  msecs: Date.now(),
+  seq: 0
+}
+```
+
+## Verify Installation
+
+After installation, verify that uniku works correctly:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+console.log(uuidv7())
+// Should print something like: "018e5e5c-7c8a-7000-8000-000000000000"
+```
+
+If you see a UUID string printed, you're all set!
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Generate your first ID and learn the basics
+  </Card>
+  
+  <Card title="API Reference" icon="book" href="/api/uuidv4">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>

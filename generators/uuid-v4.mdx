@@ -1,0 +1,238 @@
+---
+title: UUID v4
+description: Generate random UUIDs with maximum compatibility
+---
+
+# UUID v4
+
+UUID v4 is a purely random UUID with 122 bits of entropy. It's the most widely compatible UUID format, supported by virtually all databases and systems.
+
+## When to Use
+
+Use UUID v4 when you need:
+- **Maximum compatibility** - Supported everywhere
+- **Random identifiers** - No sequential patterns
+- **Standard format** - RFC 4122 compliant
+- **Database foreign keys** - Works in any system
+
+<Warning>
+UUID v4 is **not** time-ordered. For better database index performance with primary keys, consider [UUID v7](/generators/uuid-v7) or [ULID](/generators/ulid) instead.
+</Warning>
+
+## Basic Usage
+
+```typescript
+import { uuidv4 } from 'uniku/uuid/v4'
+
+const id = uuidv4()
+// => "550e8400-e29b-41d4-a716-446655440000"
+```
+
+## API Reference
+
+### Main Function
+
+<ParamField path="uuidv4()" type="() => string">
+  Generate a UUID v4 string using the browser's native `crypto.randomUUID()` when no options are provided (fastest path).
+</ParamField>
+
+<ParamField path="uuidv4(options)" type="(options?: UuidV4Options) => string">
+  Generate a UUID v4 string with custom random bytes.
+  
+  **Options:**
+  - `random?: Uint8Array` - 16 bytes of random data. Note: Bytes at index 6 and 8 will be modified in-place to set version/variant bits.
+</ParamField>
+
+<ParamField path="uuidv4(options, buf, offset)" type="<TBuf extends Uint8Array>(options: UuidV4Options | undefined, buf: TBuf, offset?: number) => TBuf">
+  Write UUID v4 bytes directly into a buffer at the specified offset.
+  
+  **Parameters:**
+  - `options` - UUID generation options or `undefined`
+  - `buf` - Target buffer (must have at least 16 bytes available from offset)
+  - `offset` - Starting position in buffer (default: 0)
+  
+  **Returns:** The same buffer passed in (for chaining)
+</ParamField>
+
+### Static Methods
+
+<ParamField path="uuidv4.toBytes(id)" type="(id: string) => Uint8Array">
+  Convert a UUID string to a 16-byte `Uint8Array`.
+  
+  ```typescript
+  const bytes = uuidv4.toBytes("550e8400-e29b-41d4-a716-446655440000")
+  // => Uint8Array(16) [85, 14, 132, 0, 226, 155, 65, 212, ...]
+  ```
+</ParamField>
+
+<ParamField path="uuidv4.fromBytes(bytes)" type="(bytes: Uint8Array) => string">
+  Convert a 16-byte `Uint8Array` to a UUID string.
+  
+  ```typescript
+  const id = uuidv4.fromBytes(bytes)
+  // => "550e8400-e29b-41d4-a716-446655440000"
+  ```
+</ParamField>
+
+<ParamField path="uuidv4.isValid(id)" type="(id: unknown) => id is string">
+  Validate that a value is a properly formatted UUID v4 string. TypeScript type guard.
+  
+  ```typescript
+  uuidv4.isValid("550e8400-e29b-41d4-a716-446655440000") // true
+  uuidv4.isValid("not-a-uuid") // false
+  ```
+</ParamField>
+
+### Constants
+
+<ParamField path="uuidv4.NIL" type="string">
+  The nil UUID (all zeros): `"00000000-0000-0000-0000-000000000000"`
+</ParamField>
+
+<ParamField path="uuidv4.MAX" type="string">
+  The max UUID (all ones): `"ffffffff-ffff-ffff-ffff-ffffffffffff"`
+</ParamField>
+
+## Real-World Examples
+
+### Database Entity IDs
+
+```typescript
+import { uuidv4 } from 'uniku/uuid/v4'
+
+interface User {
+  id: string
+  email: string
+  createdAt: Date
+}
+
+function createUser(email: string): User {
+  return {
+    id: uuidv4(),
+    email,
+    createdAt: new Date()
+  }
+}
+```
+
+### Request Tracking
+
+```typescript
+import { uuidv4 } from 'uniku/uuid/v4'
+
+app.use((req, res, next) => {
+  req.id = uuidv4()
+  res.setHeader('X-Request-ID', req.id)
+  next()
+})
+```
+
+### Bulk Generation with Buffer
+
+```typescript
+import { uuidv4 } from 'uniku/uuid/v4'
+
+// Generate 1000 UUIDs efficiently using a single buffer
+const buffer = new Uint8Array(16 * 1000)
+const ids: string[] = []
+
+for (let i = 0; i < 1000; i++) {
+  uuidv4(undefined, buffer, i * 16)
+  ids.push(uuidv4.fromBytes(buffer.subarray(i * 16, (i + 1) * 16)))
+}
+```
+
+### Binary Storage
+
+```typescript
+import { uuidv4 } from 'uniku/uuid/v4'
+
+// Store UUID as binary (16 bytes) instead of string (36 bytes)
+const id = uuidv4()
+const bytes = uuidv4.toBytes(id)
+
+// Save bytes to database or file
+await db.insert({ id: bytes })
+
+// Read back and convert to string
+const row = await db.findOne()
+const idString = uuidv4.fromBytes(row.id)
+```
+
+## Type Definitions
+
+```typescript
+type UuidV4Options = {
+  /**
+   * 16 bytes of random data to use for UUID generation.
+   * Note: Bytes at index 6 and 8 will be modified in-place 
+   * to set version/variant bits.
+   */
+  random?: Uint8Array
+}
+
+type UuidV4 = {
+  (): string
+  <TBuf extends Uint8Array = Uint8Array>(
+    options: UuidV4Options | undefined, 
+    buf: TBuf, 
+    offset?: number
+  ): TBuf
+  (options?: UuidV4Options, buf?: undefined, offset?: number): string
+  toBytes(id: string): Uint8Array
+  fromBytes(bytes: Uint8Array): string
+  isValid(id: unknown): id is string
+  NIL: string
+  MAX: string
+}
+```
+
+## Performance Characteristics
+
+<CardGroup cols={2}>
+  <Card title="Generation Speed" icon="bolt">
+    Extremely fast - uses native `crypto.randomUUID()` when no options provided
+  </Card>
+  <Card title="Entropy" icon="shield">
+    122 bits of cryptographically secure randomness
+  </Card>
+  <Card title="Size" icon="chart-simple">
+    36 characters (string) or 16 bytes (binary)
+  </Card>
+  <Card title="Collision Risk" icon="triangle-exclamation">
+    Negligible - 1 in 2^122 chance
+  </Card>
+</CardGroup>
+
+<Info>
+**Bundle Size:** ~940 bytes minified + gzipped
+</Info>
+
+## Validation Pattern
+
+UUID v4 must match this pattern:
+```regex
+/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+```
+
+Key characteristics:
+- 36 characters total (32 hex + 4 hyphens)
+- Version nibble (13th character) is always `4`
+- Variant bits (17th character) is always `8`, `9`, `a`, or `b`
+
+## Migration Guide
+
+### From `uuid` Package
+
+```diff
+- import { v4 as uuidv4 } from 'uuid'
++ import { uuidv4 } from 'uniku/uuid/v4'
+
+  const id = uuidv4()
+```
+
+API is identical - drop-in replacement.
+
+<Tip>
+For time-ordered IDs that improve database index performance, see [UUID v7](/generators/uuid-v7).
+</Tip>

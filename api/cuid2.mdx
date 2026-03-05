@@ -1,0 +1,284 @@
+---
+title: "cuid2"
+description: "Generate secure, collision-resistant CUID2 identifiers with SHA3-512 hashing"
+---
+
+# CUID2
+
+Generate a CUID2 string.
+
+CUID2 is a secure, collision-resistant identifier that hashes multiple entropy sources using SHA3-512. Unlike time-ordered IDs (ULID, UUID v7), CUID2 prevents enumeration attacks by making IDs non-predictable.
+
+## Import
+
+```typescript
+import { cuid2 } from 'uniku/cuid2'
+```
+
+## Function Signature
+
+```typescript
+type Cuid2 = {
+  (options?: Cuid2Options): string
+  isValid(id: unknown): id is string
+}
+```
+
+## Basic Usage
+
+<CodeGroup>
+```typescript Generate CUID2
+const id = cuid2()
+// => "pfh0haxfpzowht3oi213cqos"
+```
+
+```typescript Custom length
+const shortId = cuid2({ length: 10 })
+// => "tz4a98xxat"
+
+const longId = cuid2({ length: 32 })
+// => "pfh0haxfpzowht3oi213cqospfh0haxf"
+```
+
+```typescript Validation
+const maybeId: unknown = getUserInput()
+
+if (cuid2.isValid(maybeId)) {
+  // TypeScript knows maybeId is a string
+  console.log(maybeId.length)
+}
+```
+</CodeGroup>
+
+## Options
+
+<ParamField path="options" type="Cuid2Options" optional>
+  Configuration options for CUID2 generation
+</ParamField>
+
+<Expandable title="Cuid2Options">
+  <ParamField path="length" type="number" optional default="24">
+    Length of the generated ID (2-32 characters).
+    
+    Longer IDs provide more entropy and collision resistance.
+  </ParamField>
+
+  <ParamField path="random" type="Uint8Array" optional>
+    Custom random bytes for deterministic testing.
+    
+    Must be at least 1 byte. For adequate entropy, use at least 16 bytes.
+    
+    **Note:** The fingerprint always uses cryptographically secure random bytes, regardless of this option.
+  </ParamField>
+</Expandable>
+
+## Static Methods
+
+### isValid()
+
+Validate whether a value is a valid CUID2 string (type guard).
+
+<ParamField path="id" type="unknown" required>
+  Value to validate
+</ParamField>
+
+<ResponseField name="return" type="id is string">
+  Type predicate: `true` if the value is a valid CUID2 string, `false` otherwise
+</ResponseField>
+
+```typescript
+const maybeId: unknown = getUserInput()
+
+if (cuid2.isValid(maybeId)) {
+  // TypeScript now knows maybeId is a string
+  storeId(maybeId)
+}
+```
+
+**Validation rules:**
+- Must be a string
+- Length must be between 2 and 32 characters
+- Must match the pattern: `/^[a-z][0-9a-z]+$/`
+- First character must be lowercase letter (`a-z`)
+- Remaining characters must be lowercase alphanumeric (`0-9a-z`)
+
+## Security Features
+
+### SHA3-512 Hashing
+
+CUID2 hashes multiple entropy sources using SHA3-512:
+- Timestamp (`Date.now()`)
+- Random salt
+- Monotonic counter
+- System fingerprint (based on global environment)
+
+This makes IDs unpredictable and prevents enumeration attacks.
+
+### Monotonic Counter
+
+An internal counter is incremented with each ID generation:
+- Initialized with cryptographically secure random value (0 to 476,782,367)
+- Provides ~29 bits of initial entropy to prevent cross-process collisions
+
+### System Fingerprint
+
+A unique fingerprint is generated based on:
+- Global object keys (`Object.keys(globalThis)`)
+- Additional random entropy
+
+The fingerprint is always generated using CSPRNG, regardless of custom random options.
+
+## Length and Entropy
+
+| Length | Bits of Entropy (approx) | Collision Probability |
+|--------|-------------------------|----------------------|
+| 10     | ~52 bits                | 1 in 4.5 quadrillion |
+| 16     | ~83 bits                | 1 in 9.7 septillion  |
+| 24 (default) | ~124 bits         | 1 in 21.3 undecillion |
+| 32     | ~165 bits               | Astronomically low   |
+
+**Recommendation:** Use the default length (24) for most applications. Shorter lengths are suitable for non-critical use cases like temporary IDs or slugs.
+
+## Advanced Usage
+
+### Deterministic Generation (Testing)
+
+Provide custom random bytes for reproducible IDs:
+
+```typescript
+const customRandom = new Uint8Array(16)
+const id = cuid2({ random: customRandom })
+
+// Same inputs produce same outputs (fingerprint will still vary)
+```
+
+**Important:** The system fingerprint always uses CSPRNG, so IDs will still vary across different environments even with the same custom random bytes.
+
+### Variable Length IDs
+
+Adjust length based on your use case:
+
+```typescript
+// Short IDs for URLs or temporary tokens
+const shortId = cuid2({ length: 10 })
+// => "tz4a98xxat"
+
+// Standard IDs for database keys
+const standardId = cuid2()
+// => "pfh0haxfpzowht3oi213cqos" (24 chars)
+
+// Long IDs for maximum collision resistance
+const longId = cuid2({ length: 32 })
+// => "pfh0haxfpzowht3oi213cqospfh0haxf"
+```
+
+## State Management
+
+CUID2 maintains module-level state for:
+- **Counter**: Incremented on each call for uniqueness
+- **Fingerprint**: Generated once on first call and cached
+
+**Important:** This state persists across calls:
+- In serverless/edge functions with warm starts, state persists between invocations
+- For isolated state in tests, consider mocking or resetting the module
+
+## Format
+
+CUID2 uses a Base36 alphabet (`0-9a-z`) for URL-safe, case-insensitive IDs:
+- First character: Always a lowercase letter (`a-z`) for safe use in various contexts
+- Remaining characters: Lowercase alphanumeric (`0-9a-z`)
+
+```typescript
+const id = cuid2()
+// Example: "pfh0haxfpzowht3oi213cqos"
+//          ^                        
+//          First char is always a-z
+```
+
+## Binary Representation
+
+**Note:** Unlike UUID and ULID, CUID2 does not provide `toBytes()`/`fromBytes()` because it is a string-native format with no canonical binary representation.
+
+CUID2 is designed as a hash-based string identifier. While you could convert the Base36 string to bytes, there's no standardized binary format, and the conversion would lose the semantic meaning of the ID.
+
+## Errors
+
+<ResponseField name="InvalidInputError" type="Error">
+  Thrown when options are invalid:
+  
+  - **Code:** `CUID2_LENGTH_OUT_OF_RANGE` - Length must be 2-32
+  - **Code:** `CUID2_RANDOM_BYTES_EMPTY` - Random byte array cannot be empty
+</ResponseField>
+
+```typescript
+import { InvalidInputError } from 'uniku/cuid2'
+
+try {
+  const id = cuid2({ length: 50 }) // Invalid length
+} catch (error) {
+  if (error instanceof InvalidInputError) {
+    console.log(error.code) // => "CUID2_LENGTH_OUT_OF_RANGE"
+  }
+}
+```
+
+## Type Definitions
+
+```typescript
+export type Cuid2Options = {
+  /**
+   * Length of the generated ID (2-32 characters).
+   * Default: 24
+   */
+  length?: number
+  /**
+   * Custom random bytes for deterministic testing.
+   * Must be at least 1 byte. For adequate entropy, use at least 16 bytes.
+   * Note: The fingerprint always uses cryptographically secure random bytes,
+   * regardless of this option.
+   */
+  random?: Uint8Array
+}
+
+export type Cuid2 = {
+  (options?: Cuid2Options): string
+  isValid(id: unknown): id is string
+}
+```
+
+## Performance
+
+CUID2 is optimized for security over speed:
+- SHA3-512 hashing adds computational overhead
+- Internal random pool for efficient random number generation
+- Fingerprint is generated once and cached
+
+Benchmark: ~8× faster than `@paralleldrive/cuid2` npm package.
+
+## Use Cases
+
+CUID2 is ideal when you need:
+- **Non-enumerable IDs**: Prevent users from guessing other IDs
+- **API tokens**: Secure, unpredictable tokens
+- **Public-facing IDs**: User IDs, order IDs where enumeration is a concern
+- **Distributed systems**: Collision-resistant without coordination
+
+**Not ideal for:**
+- **Time-ordered database indexes**: Use [UUID v7](/api/uuidv7) or [ULID](/api/ulid) instead
+- **Ultra-high throughput**: CUID2's hashing is slower than pure random IDs
+
+## Migration from CUID (v1)
+
+CUID2 is not backward-compatible with CUID (v1):
+- Different format (no timestamp prefix)
+- Different hashing algorithm (SHA3-512 vs MD5)
+- Improved collision resistance
+- Better security guarantees
+
+If migrating from CUID v1, you'll need to handle both formats during a transition period.
+
+## See Also
+
+- [Nanoid](/api/nanoid) - Faster, URL-safe IDs without hashing
+- [UUID v7](/api/uuidv7) - Time-ordered for database indexes
+- [ULID](/api/ulid) - Time-ordered with Crockford Base32

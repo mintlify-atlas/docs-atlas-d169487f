@@ -1,97 +1,133 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "uniku"
+description: "One library. Every ID format. Every runtime. Zero dependencies."
 ---
 
-## Setting up
+<div className="bg-white rounded-lg border border-[#e0e0e0] p-8 mb-8" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+  <div className="text-center">
+    <h1 className="text-5xl font-bold mb-4" style={{ fontFamily: 'Inter', color: '#1a1a1a' }}>
+      uniku
+    </h1>
+    <p className="text-xl mb-6" style={{ fontFamily: 'Inter', color: '#1a1a1a' }}>
+      TypeScript ID generator for every JavaScript runtime
+    </p>
+    <p className="text-sm mb-8" style={{ color: '#545454' }}>
+      <em>/uˈniːku/</em> — Maltese for "unique"
+    </p>
+    <div className="flex gap-4 justify-center mb-6">
+      <a
+        href="/quickstart"
+        className="px-6 py-3 rounded-md font-semibold"
+        style={{ 
+          background: '#e6e6e6', 
+          color: '#1a1a1a',
+          textDecoration: 'none',
+          borderRadius: '6px'
+        }}
+      >
+        Get Started
+      </a>
+      <a
+        href="https://github.com/jkomyno/uniku"
+        className="px-6 py-3 rounded-md font-semibold"
+        style={{ 
+          background: 'transparent',
+          border: '1px solid #1a1a1a',
+          color: '#1a1a1a',
+          textDecoration: 'none',
+          borderRadius: '6px'
+        }}
+      >
+        View on GitHub
+      </a>
+    </div>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+## Why uniku?
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Universal Runtime Support" icon="globe">
+    Works everywhere: Node.js, Deno, Bun, Cloudflare Workers, Vercel Edge, and browsers using Web Crypto API
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Six ID Formats" icon="fingerprint">
+    UUID v4/v7, ULID, CUID2, Nanoid, and KSUID — all in one library
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Tree-Shakeable" icon="tree">
+    Separate entry points mean you only bundle what you import. No barrel exports.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Byte-Level Access" icon="binary">
+    Convert between ID strings and Uint8Array with built-in toBytes() and fromBytes()
   </Card>
-</Columns>
+  <Card title="Time-Ordered IDs" icon="clock">
+    UUID v7, ULID, and KSUID provide sortable identifiers with monotonic sequencing
+  </Card>
+  <Card title="Modern Standards" icon="star">
+    Includes UUID v7 (RFC 9562) for time-ordered, sortable identifiers
+  </Card>
+</CardGroup>
 
-## Create beautiful pages
+## Quick Example
 
-Everything you need to create world-class documentation.
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+const id = uuidv7()
+// => "018e5e5c-7c8a-7000-8000-000000000000"
 
-## Need inspiration?
+// Time-ordered: IDs sort by creation time
+const [first, second, third] = [uuidv7(), uuidv7(), uuidv7()]
+console.log(first < second && second < third) // true
+```
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+## Performance
+
+Benchmarks comparing uniku string ID generation with equivalent npm packages:
+
+| Generator | uniku vs npm |
+|-----------|-------------:|
+| ULID      | **85× faster** |
+| CUID2     | **8× faster** |
+| KSUID     | **1.5× faster** |
+| UUID v7   | **1.1× faster**  |
+| Nanoid    | **~comparable speed** |
+
+## Choose Your ID Generator
+
+<CardGroup cols={3}>
+  <Card title="UUID v4" icon="shuffle" href="/generators/uuid-v4">
+    Random UUID with maximum compatibility
+  </Card>
+  <Card title="UUID v7" icon="clock" href="/generators/uuid-v7">
+    Time-ordered UUID for database keys
+  </Card>
+  <Card title="ULID" icon="arrow-up-short-wide" href="/generators/ulid">
+    Sortable, 26-character identifier
+  </Card>
+  <Card title="CUID2" icon="shield" href="/generators/cuid2">
+    Secure, collision-resistant IDs
+  </Card>
+  <Card title="Nanoid" icon="link" href="/generators/nanoid">
+    Compact, URL-friendly IDs
+  </Card>
+  <Card title="KSUID" icon="database" href="/generators/ksuid">
+    K-Sortable with high entropy
+  </Card>
+</CardGroup>
+
+## Get Started
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install uniku using your favorite package manager
+  </Card>
+  <Card title="Quickstart" icon="bolt" href="/quickstart">
+    Generate your first ID in under 2 minutes
+  </Card>
+  <Card title="CLI Tool" icon="terminal" href="/cli/overview">
+    Command-line tool for generating and validating IDs
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/uuidv4">
+    Complete API documentation for all generators
+  </Card>
+</CardGroup>

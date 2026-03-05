@@ -1,0 +1,367 @@
+---
+title: Generate IDs
+description: Generate unique identifiers using UUID, ULID, CUID2, Nanoid, and KSUID
+---
+
+The CLI provides commands to generate IDs using all supported generators. Each generator has specific options for customization.
+
+## Basic Usage
+
+Generate a single ID using shorthand syntax:
+
+```bash
+uniku uuid    # UUID v4 (default)
+uniku ulid    # ULID
+uniku nanoid  # Nanoid
+uniku cuid    # CUID2
+uniku ksuid   # KSUID
+```
+
+Or use the explicit `generate` command:
+
+```bash
+uniku generate uuid
+uniku generate ulid
+```
+
+## UUID Generation
+
+Generate UUIDs (version 4 or 7):
+
+```bash
+# UUID v4 (random, default)
+uniku uuid
+# => 550e8400-e29b-41d4-a716-446655440000
+
+# UUID v7 (time-ordered)
+uniku uuid --version 7
+# => 018e5e5c-7c8a-7000-8000-000000000000
+```
+
+### UUID Options
+
+<ParamField path="--version" type="4 | 7" default="4">
+  UUID version to generate. Alias: `-v`
+  
+  - `4` — Random UUID (RFC 4122)
+  - `7` — Time-ordered UUID with millisecond precision (RFC 9562)
+  
+  ```bash
+  uniku uuid --version 7
+  ```
+</ParamField>
+
+<ParamField path="--lowercase" type="boolean" default="false">
+  Output in lowercase instead of uppercase. Alias: `-l`
+  
+  ```bash
+  uniku uuid --lowercase
+  # => 550e8400-e29b-41d4-a716-446655440000
+  ```
+</ParamField>
+
+<ParamField path="--count" type="number" default="1">
+  Number of UUIDs to generate. Alias: `-n`
+  
+  ```bash
+  uniku uuid --count 5
+  ```
+</ParamField>
+
+<CodeGroup>
+```bash UUID v4
+uniku uuid --count 3
+550e8400-e29b-41d4-a716-446655440000
+6ba7b810-9dad-11d1-80b4-00c04fd430c8
+7c9e6679-7425-40de-944b-e07fc1f90ae7
+```
+
+```bash UUID v7
+uniku uuid --version 7 --count 3
+018e5e5c-7c8a-7000-8000-000000000000
+018e5e5c-7c8b-7000-8000-111111111111
+018e5e5c-7c8c-7000-8000-222222222222
+```
+
+```bash Lowercase
+uniku uuid --lowercase
+550e8400-e29b-41d4-a716-446655440000
+```
+</CodeGroup>
+
+<Info>
+**UUID v7** embeds a timestamp and is sortable, making it ideal for database primary keys and distributed systems.
+</Info>
+
+## ULID Generation
+
+Generate Universally Unique Lexicographically Sortable Identifiers:
+
+```bash
+# Standard ULID
+uniku ulid
+# => 01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+
+# Monotonically increasing ULIDs
+uniku ulid --monotonic --count 3
+```
+
+### ULID Options
+
+<ParamField path="--monotonic" type="boolean" default="false">
+  Generate monotonically increasing ULIDs with the same timestamp
+  
+  ```bash
+  uniku ulid --monotonic --count 5
+  ```
+  
+  Guarantees that each successive ULID is lexicographically greater, even if generated within the same millisecond.
+</ParamField>
+
+<ParamField path="--timestamp" type="string">
+  Unix timestamp in milliseconds or `"now"`
+  
+  ```bash
+  uniku ulid --timestamp 1704067200000
+  uniku ulid --timestamp now
+  ```
+</ParamField>
+
+<ParamField path="--lowercase" type="boolean" default="false">
+  Output in lowercase. Alias: `-l`
+  
+  ```bash
+  uniku ulid --lowercase
+  # => 01hw9t2w9w9yj3jz1h4p4m2t8q
+  ```
+</ParamField>
+
+<CodeGroup>
+```bash Standard ULID
+uniku ulid --count 3
+01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+01HW9T2W9XABCDEFGHIJKLMNOP
+01HW9T2W9YZYXWVUTSRQPONMLK
+```
+
+```bash Monotonic ULIDs
+uniku ulid --monotonic --count 3
+01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+01HW9T2W9W9YJ3JZ1H4P4M2T8R
+01HW9T2W9W9YJ3JZ1H4P4M2T8S
+```
+
+```bash Custom Timestamp
+uniku ulid --timestamp 1704067200000
+01HM0000009YJ3JZ1H4P4M2T8Q
+```
+</CodeGroup>
+
+<Tip>
+Use `--monotonic` when generating multiple ULIDs in rapid succession to guarantee sort order.
+</Tip>
+
+## Nanoid Generation
+
+Generate compact, URL-safe unique identifiers:
+
+```bash
+# Default 21-character Nanoid
+uniku nanoid
+# => V1StGXR8_Z5jdHi6B-myT
+
+# Custom size
+uniku nanoid --size 12
+# => V1StGXR8_Z5j
+```
+
+### Nanoid Options
+
+<ParamField path="--size" type="number" default="21">
+  Length of the generated ID (1-256). Alias: `-s`
+  
+  ```bash
+  uniku nanoid --size 32
+  ```
+</ParamField>
+
+<ParamField path="--alphabet" type="string">
+  Custom alphabet or preset name. Alias: `-a`
+  
+  **Presets:**
+  - `hex` — Hexadecimal (0-9, a-f)
+  - `numeric` — Numbers only (0-9)
+  - `alpha` — Letters only (a-z, A-Z)
+  
+  **Custom alphabet:**
+  ```bash
+  uniku nanoid --alphabet "0123456789ABCDEF"
+  ```
+</ParamField>
+
+<CodeGroup>
+```bash Default
+uniku nanoid --count 3
+V1StGXR8_Z5jdHi6B-myT
+K3fG9mN2pQwE7rY8sX6cH
+L9jT4vR2xD8aW5nB3kM6p
+```
+
+```bash Custom Size
+uniku nanoid --size 12 --count 3
+V1StGXR8_Z5j
+K3fG9mN2pQwE
+L9jT4vR2xD8a
+```
+
+```bash Hex Alphabet
+uniku nanoid --size 16 --alphabet hex
+a3f2d8c9b1e4f7a6
+9c4e2f1a8d5b3c7e
+```
+
+```bash Numeric Only
+uniku nanoid --size 10 --alphabet numeric
+1234567890
+9876543210
+```
+</CodeGroup>
+
+<Warning>
+Shorter IDs have higher collision probability. Use at least 21 characters for production systems.
+</Warning>
+
+## CUID2 Generation
+
+Generate collision-resistant, secure identifiers:
+
+```bash
+# Default 24-character CUID2
+uniku cuid
+# => clhw9t2w9w9yj3jz1h4p4m2t
+
+# Custom length
+uniku cuid --length 16
+```
+
+### CUID2 Options
+
+<ParamField path="--length" type="number" default="24">
+  Length of the generated ID (2-32). Alias: `-l`
+  
+  ```bash
+  uniku cuid --length 32
+  ```
+</ParamField>
+
+<CodeGroup>
+```bash Default Length
+uniku cuid --count 3
+clhw9t2w9w9yj3jz1h4p4m2t
+clhw9t2w9xabcdefghijklmn
+clhw9t2w9yzyxwvutsrqponm
+```
+
+```bash Custom Length
+uniku cuid --length 16 --count 3
+clhw9t2w9w9yj3jz
+clhw9t2w9xabcdef
+clhw9t2w9yzyxwvu
+```
+</CodeGroup>
+
+<Info>
+CUID2 is designed to be collision-resistant even without coordination. It's ideal for distributed systems where UUIDs feel too long.
+</Info>
+
+## KSUID Generation
+
+Generate K-Sortable Unique Identifiers:
+
+```bash
+# Standard KSUID
+uniku ksuid
+# => 2HbcvN9VFGzP8jR5mK3QxW4d
+
+# Custom timestamp
+uniku ksuid --timestamp 1704067200
+```
+
+### KSUID Options
+
+<ParamField path="--timestamp" type="string">
+  Unix timestamp in seconds or `"now"`
+  
+  ```bash
+  uniku ksuid --timestamp 1704067200
+  uniku ksuid --timestamp now
+  ```
+</ParamField>
+
+<CodeGroup>
+```bash Standard KSUID
+uniku ksuid --count 3
+2HbcvN9VFGzP8jR5mK3QxW4d
+2HbcvN9VFH1Q9kS6nL4RyX5e
+2HbcvN9VFH2R0lT7oM5SzY6f
+```
+
+```bash Custom Timestamp
+uniku ksuid --timestamp 1704067200 --count 2
+2HM00009VFGzP8jR5mK3QxW4d
+2HM00009VFH1Q9kS6nL4RyX5e
+```
+</CodeGroup>
+
+<Tip>
+KSUIDs encode timestamps with second precision (vs. millisecond for ULIDs), making them slightly more compact.
+</Tip>
+
+## JSON Output
+
+All generation commands support `--json` for structured output:
+
+```bash
+uniku uuid --count 3 --json
+```
+
+```json
+[
+  {"id":"550e8400-e29b-41d4-a716-446655440000"},
+  {"id":"6ba7b810-9dad-11d1-80b4-00c04fd430c8"},
+  {"id":"7c9e6679-7425-40de-944b-e07fc1f90ae7"}
+]
+```
+
+This is useful for scripting and programmatic consumption:
+
+```bash
+# Extract IDs using jq
+uniku uuid --count 5 --json | jq -r '.[].id'
+
+# Store in a variable
+ID=$(uniku uuid --json | jq -r '.id')
+echo "Generated ID: $ID"
+```
+
+## Comparison Table
+
+| Generator | Default Length | Time-Ordered | Monotonic | URL-Safe |
+|-----------|---------------|--------------|-----------|----------|
+| UUID v4   | 36 chars      | No           | No        | No       |
+| UUID v7   | 36 chars      | Yes (ms)     | Yes       | No       |
+| ULID      | 26 chars      | Yes (ms)     | Optional  | Yes      |
+| Nanoid    | 21 chars      | No           | No        | Yes      |
+| CUID2     | 24 chars      | No           | No        | Yes      |
+| KSUID     | 27 chars      | Yes (sec)    | Yes       | Yes      |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Validate IDs" icon="shield-check" href="/cli/validate">
+    Validate generated IDs with auto-detection
+  </Card>
+  <Card title="Inspect IDs" icon="magnifying-glass" href="/cli/inspect">
+    Extract timestamps from time-ordered IDs
+  </Card>
+</CardGroup>

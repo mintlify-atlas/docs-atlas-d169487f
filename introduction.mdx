@@ -1,0 +1,175 @@
+---
+title: Introduction
+description: One library. Every ID format. Every runtime. Zero dependencies.
+---
+
+**uniku** */uˈniːku/* — Maltese for "unique"
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+const id = uuidv7()
+// => "018e5e5c-7c8a-7000-8000-000000000000"
+
+// Time-ordered: IDs sort by creation time
+const [first, second, third] = [uuidv7(), uuidv7(), uuidv7()]
+console.log(first < second && second < third) // true
+```
+
+## What is uniku?
+
+uniku is a modern TypeScript library that provides six different ID generation formats in a single, tree-shakeable package. It's designed to work everywhere: Node.js, Cloudflare Workers, Vercel Edge, Deno, Bun, and browsers.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Universal Runtime Support" icon="globe">
+    Works everywhere using the Web Crypto API (`globalThis.crypto`). No Node.js-specific dependencies.
+  </Card>
+  
+  <Card title="Six ID Formats" icon="hashtag">
+    UUID v4, UUID v7, ULID, CUID2, Nanoid, and KSUID — all in one library.
+  </Card>
+  
+  <Card title="Tree-Shakeable" icon="tree">
+    Separate entry points mean you only bundle what you import. No barrel exports.
+  </Card>
+  
+  <Card title="Byte-Level Access" icon="binary">
+    Convert between ID strings and `Uint8Array` with built-in `toBytes()` and `fromBytes()`.
+  </Card>
+</CardGroup>
+
+<Note>
+With uniku, you can replace multiple ID generation libraries with a single, optimized package that weighs less than any individual alternative.
+</Note>
+
+## Comparison with Other Libraries
+
+|                    | uniku | uuid | nanoid | ulid | cuid2 | ksuid |
+|--------------------|:-----:|:----:|:------:|:----:|:-----:|:-----:|
+| UUID v4            |   ✅  |  ✅  |   ❌   |  ❌  |   ❌  |   ❌  |
+| UUID v7            |   ✅  |  ✅  |   ❌   |  ❌  |   ❌  |   ❌  |
+| ULID               |   ✅  |  ❌  |   ❌   |  ✅  |   ❌  |   ❌  |
+| CUID2              |   ✅  |  ❌  |   ❌   |  ❌  |   ✅  |   ❌  |
+| Nanoid             |   ✅  |  ❌  |   ✅   |  ❌  |   ❌  |   ❌  |
+| KSUID              |   ✅  |  ❌  |   ❌   |  ❌  |   ❌  |   ✅  |
+| Tree-shakeable     |   ✅  |  ✅  |   ✅   |  ✅  |   ✅  |   ❌  |
+| ESM-only           |   ✅  | ✅¹  |   ✅   |  ❌  |   ✅  |   ❌  |
+| Edge/Workers       |   ✅  |  ✅  |   ✅   |  ⚠️  |   ✅  |  ⚠️  |
+| Byte ↔ String      |   ✅  |  ✅  |   -   |  ⚠️²  |   -  |   ✅  |
+
+<Info>
+**Notes:**
+- ¹ `uuid@13` is ESM-only; earlier versions support CommonJS.
+- ² `ulid` only provides timestamp encoding/decoding, not full binary serialization.
+- Byte ↔ String conversion doesn't make sense for nanoid and cuid2, since they are string-native formats with no canonical binary representation.
+</Info>
+
+## Performance
+
+Benchmarks comparing uniku string ID generation with equivalent npm packages:
+
+| Generator | uniku vs npm |
+|-----------|-------------:|
+| ULID      | **85× faster** |
+| CUID2     | **8× faster** |
+| KSUID     | **1.5× faster** |
+| UUID v7   | **1.1× faster**  |
+| Nanoid    | **~comparable speed** |
+| UUID v4   | npm is 1.1× faster |
+
+<Tip>
+For most use cases, uniku is either faster or comparable to dedicated single-format libraries.
+</Tip>
+
+## Which ID Should I Use?
+
+Choose the right ID format for your use case:
+
+| Use Case | Recommended | Why |
+|----------|-------------|-----|
+| Database primary keys | **UUID v7** or **ULID** | Time-ordered for index efficiency |
+| URL shorteners | **Nanoid** | Compact, URL-safe characters |
+| Prevent enumeration | **CUID2** | Non-sequential, secure |
+| Maximum compatibility | **UUID v4** | Universal standard |
+| Distributed systems | **ULID** | Sortable + high entropy |
+
+### Detailed Comparison
+
+**UUID v7** (Recommended for most use cases)
+- Time-ordered with millisecond precision
+- 128-bit (16 bytes)
+- Lexicographically sortable
+- Follows RFC 9562 standard
+- Ideal for database primary keys
+
+**UUID v4** (Maximum compatibility)
+- Purely random
+- 122 bits of entropy
+- Most widely supported
+- No time ordering
+
+**ULID** (Alternative to UUID v7)
+- Time-ordered with millisecond precision
+- 128-bit (16 bytes)
+- Crockford Base32 encoded (URL-safe)
+- Lexicographically sortable
+- More compact string representation than UUID
+
+**CUID2** (Security-focused)
+- Non-sequential to prevent enumeration
+- Uses SHA3-512 hashing
+- Configurable length (2-32 characters)
+- No timestamp component
+- Best when you need unpredictability
+
+**Nanoid** (Compact URLs)
+- 21 characters by default
+- URL-safe alphabet
+- Customizable size and alphabet
+- No time ordering
+- Smallest string representation
+
+**KSUID** (Second-precision timestamp)
+- Time-ordered with second precision
+- 160-bit (20 bytes)
+- Base62 encoded
+- Lexicographically sortable
+- Good for distributed systems
+
+## Works Everywhere
+
+uniku uses the Web Crypto API (`globalThis.crypto`), which means it works in all modern JavaScript environments:
+
+- **Node.js** (v24.13.0+)
+- **Deno**
+- **Bun**
+- **Cloudflare Workers**
+- **Vercel Edge Functions**
+- **Modern Browsers**
+
+<Warning>
+uniku is ESM-only and does not support CommonJS. Make sure your project is configured for ESM.
+</Warning>
+
+## Why Choose uniku?
+
+1. **Modern Architecture**: ESM-only, no legacy CommonJS support
+2. **Universal Compatibility**: Works in all JavaScript runtimes
+3. **Truly Tree-Shakeable**: Separate entry points, no barrel exports
+4. **Byte-Level Control**: Full binary serialization support
+5. **Production Ready**: Battle-tested with comprehensive test coverage
+6. **Lightweight**: Designed for performance-sensitive contexts like ORMs
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Get started by installing uniku in your project
+  </Card>
+  
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Generate your first ID in under 5 minutes
+  </Card>
+</CardGroup>

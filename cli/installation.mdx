@@ -1,0 +1,216 @@
+---
+title: CLI Installation
+description: Install the uniku CLI using pre-built binaries or npm package managers
+---
+
+The uniku CLI can be installed via pre-built standalone binaries (recommended) or through npm package managers.
+
+## Pre-built Binary (Recommended)
+
+Download and install a standalone binary with no Node.js dependency:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jkomyno/uniku/main/install.sh | sh
+```
+
+This script:
+- Detects your platform (macOS Intel/Apple Silicon, Linux x64)
+- Downloads the appropriate pre-built binary
+- Installs it to `/usr/local/bin` by default
+- Makes it executable and adds it to your PATH
+
+<Note>
+**Supported platforms:**
+- macOS (Intel and Apple Silicon)
+- Linux (x64)
+
+Windows support coming soon. Use npm installation on Windows for now.
+</Note>
+
+### Custom Installation Directory
+
+Override the default installation location using `UNIKU_INSTALL_DIR`:
+
+<CodeGroup>
+```bash Custom Directory
+UNIKU_INSTALL_DIR=~/.local/bin curl -fsSL https://raw.githubusercontent.com/jkomyno/uniku/main/install.sh | sh
+```
+
+```bash Home Directory
+UNIKU_INSTALL_DIR=~/bin curl -fsSL https://raw.githubusercontent.com/jkomyno/uniku/main/install.sh | sh
+```
+</CodeGroup>
+
+<Warning>
+Make sure your custom installation directory is in your `PATH`:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+</Warning>
+
+### Install Specific Version
+
+Install a specific version instead of the latest:
+
+```bash
+UNIKU_VERSION=0.0.12 curl -fsSL https://raw.githubusercontent.com/jkomyno/uniku/main/install.sh | sh
+```
+
+You can combine both environment variables:
+
+```bash
+UNIKU_INSTALL_DIR=~/.local/bin UNIKU_VERSION=0.0.12 curl -fsSL https://raw.githubusercontent.com/jkomyno/uniku/main/install.sh | sh
+```
+
+## npm Installation
+
+Install globally using your preferred package manager:
+
+<CodeGroup>
+```bash pnpm
+pnpm add -g @uniku/cli
+```
+
+```bash npm
+npm install -g @uniku/cli
+```
+
+```bash bun
+bun add -g @uniku/cli
+```
+
+```bash yarn
+yarn global add @uniku/cli
+```
+</CodeGroup>
+
+<Info>
+**Prerequisites:** Node.js 18+ or Bun 1.0+ is required for npm installation.
+</Info>
+
+### Local Installation
+
+You can also install it locally in a project:
+
+<CodeGroup>
+```bash pnpm
+pnpm add -D @uniku/cli
+```
+
+```bash npm
+npm install -D @uniku/cli
+```
+
+```bash bun
+bun add -d @uniku/cli
+```
+</CodeGroup>
+
+Then run via npx or add to your package.json scripts:
+
+```json package.json
+{
+  "scripts": {
+    "gen:id": "uniku uuid --version 7"
+  }
+}
+```
+
+## Verify Installation
+
+Confirm the CLI is installed correctly:
+
+```bash
+uniku --version
+# => @uniku/cli/0.0.12
+```
+
+Run a quick test:
+
+```bash
+uniku uuid
+# => 550e8400-e29b-41d4-a716-446655440000
+```
+
+<Tip>
+The pre-built binary is significantly faster to install and doesn't require Node.js, making it ideal for CI/CD environments and Docker containers.
+</Tip>
+
+## Updating
+
+### Pre-built Binary
+
+Re-run the installation script to get the latest version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jkomyno/uniku/main/install.sh | sh
+```
+
+Or specify a version:
+
+```bash
+UNIKU_VERSION=0.0.13 curl -fsSL https://raw.githubusercontent.com/jkomyno/uniku/main/install.sh | sh
+```
+
+### npm
+
+Update using your package manager:
+
+<CodeGroup>
+```bash pnpm
+pnpm update -g @uniku/cli
+```
+
+```bash npm
+npm update -g @uniku/cli
+```
+
+```bash bun
+bun update -g @uniku/cli
+```
+</CodeGroup>
+
+## Uninstalling
+
+### Pre-built Binary
+
+Remove the binary from your installation directory:
+
+```bash
+rm /usr/local/bin/uniku
+```
+
+Or if you used a custom directory:
+
+```bash
+rm ~/.local/bin/uniku
+```
+
+### npm
+
+<CodeGroup>
+```bash pnpm
+pnpm remove -g @uniku/cli
+```
+
+```bash npm
+npm uninstall -g @uniku/cli
+```
+
+```bash bun
+bun remove -g @uniku/cli
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Generate IDs" icon="sparkles" href="/cli/generate">
+    Start generating IDs with all supported types
+  </Card>
+  <Card title="CLI Overview" icon="terminal" href="/cli/overview">
+    Learn about available commands and options
+  </Card>
+</CardGroup>

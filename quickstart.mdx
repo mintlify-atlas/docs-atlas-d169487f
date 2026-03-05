@@ -1,80 +1,280 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Generate your first ID with uniku in under 5 minutes.
 ---
 
-## Get started in three steps
+This guide will walk you through generating your first ID, validating it, and converting it to bytes. We'll use **UUID v7** as it's the most common use case for database primary keys.
 
-Get your documentation site running locally and make your first customization.
+<Steps>
+  <Step title="Import the generator">
+    Import the `uuidv7` function from the dedicated entry point:
 
-### Step 1: Set up your local environment
+    ```typescript
+    import { uuidv7 } from 'uniku/uuid/v7'
+    ```
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    <Note>
+    Each ID format has its own entry point (e.g., `uniku/uuid/v4`, `uniku/ulid`, `uniku/nanoid`). This ensures optimal tree-shaking.
+    </Note>
+  </Step>
 
-### Step 2: Deploy your changes
+  <Step title="Generate your first ID">
+    Call the function to generate a UUID v7 string:
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```typescript
+    const id = uuidv7()
+    console.log(id)
+    // => "018e5e5c-7c8a-7000-8000-000000000000"
+    ```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    UUID v7 IDs are time-ordered and lexicographically sortable:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```typescript
+    const ids = [uuidv7(), uuidv7(), uuidv7()]
+    console.log(ids[0] < ids[1] && ids[1] < ids[2]) // true
+    ```
 
-### Step 3: Go live
+    <Tip>
+    Time-ordered IDs are ideal for database indexes because they maintain insertion order, reducing index fragmentation.
+    </Tip>
+  </Step>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+  <Step title="Validate an ID">
+    Use the `isValid()` method to check if a string is a valid UUID v7:
 
-## Next steps
+    ```typescript
+    const id = uuidv7()
 
-Now that you have your docs running, explore these key features:
+    if (uuidv7.isValid(id)) {
+      console.log('Valid UUID v7!')
+    }
+
+    // TypeScript type guard
+    const maybeId: unknown = getUserInput()
+    if (uuidv7.isValid(maybeId)) {
+      // TypeScript now knows maybeId is a string
+      console.log(maybeId.toUpperCase())
+    }
+    ```
+
+    <Info>
+    The `isValid()` method is a TypeScript type guard, which means it narrows the type from `unknown` to `string`.
+    </Info>
+  </Step>
+
+  <Step title="Convert to bytes">
+    Convert the ID string to a `Uint8Array` for binary storage:
+
+    ```typescript
+    const id = uuidv7()
+    // => "018e5e5c-7c8a-7000-8000-000000000000"
+
+    const bytes = uuidv7.toBytes(id)
+    console.log(bytes)
+    // => Uint8Array(16) [1, 142, 94, 92, 124, 138, 112, 0, ...]
+
+    console.log(bytes.length)
+    // => 16
+    ```
+
+    <Note>
+    UUIDs are always 16 bytes (128 bits). Storing them as bytes instead of strings saves 20 bytes per ID in your database.
+    </Note>
+  </Step>
+
+  <Step title="Convert from bytes">
+    Convert a `Uint8Array` back to a UUID string:
+
+    ```typescript
+    const bytes = new Uint8Array([
+      1, 142, 94, 92, 124, 138, 112, 0,
+      128, 0, 0, 0, 0, 0, 0, 0
+    ])
+
+    const id = uuidv7.fromBytes(bytes)
+    console.log(id)
+    // => "018e5e5c-7c8a-7000-8000-000000000000"
+    ```
+
+    This is useful when reading binary-encoded IDs from a database.
+  </Step>
+
+  <Step title="Extract timestamp (optional)">
+    UUID v7 embeds a timestamp. Extract it with the `timestamp()` method:
+
+    ```typescript
+    const id = uuidv7()
+    const timestamp = uuidv7.timestamp(id)
+
+    console.log(new Date(timestamp))
+    // => 2024-03-15T10:30:45.123Z
+
+    console.log(timestamp)
+    // => 1710500445123 (milliseconds since Unix epoch)
+    ```
+
+    <Tip>
+    This is useful for debugging or auditing when an ID was created without storing a separate timestamp column.
+    </Tip>
+  </Step>
+</Steps>
+
+## Complete Example
+
+Here's a complete example combining everything:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+// Generate an ID
+const id = uuidv7()
+console.log('Generated ID:', id)
+
+// Validate
+if (uuidv7.isValid(id)) {
+  console.log('✓ Valid UUID v7')
+}
+
+// Extract timestamp
+const createdAt = new Date(uuidv7.timestamp(id))
+console.log('Created at:', createdAt.toISOString())
+
+// Convert to bytes for storage
+const bytes = uuidv7.toBytes(id)
+console.log('Bytes:', bytes)
+console.log('Size:', bytes.length, 'bytes')
+
+// Convert back to string
+const restored = uuidv7.fromBytes(bytes)
+console.log('Restored ID:', restored)
+console.log('Match:', id === restored) // true
+```
+
+## Database Integration
+
+Here's how to use uniku with a database:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+// PostgreSQL example with binary storage
+const id = uuidv7()
+const bytes = uuidv7.toBytes(id)
+
+await db.execute(
+  'INSERT INTO users (id, name) VALUES ($1, $2)',
+  [bytes, 'Alice']
+)
+
+// Retrieve and convert back
+const result = await db.query('SELECT id FROM users WHERE name = $1', ['Alice'])
+const retrievedId = uuidv7.fromBytes(result.rows[0].id)
+console.log(retrievedId) // Same as original ID
+```
+
+<Warning>
+When storing UUIDs as binary in PostgreSQL, use the `BYTEA` type, not the `UUID` type. The `UUID` type expects hyphenated strings.
+</Warning>
+
+## Advanced Usage
+
+### Custom Timestamp
+
+For testing or specific use cases, provide a custom timestamp:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+const id = uuidv7({
+  msecs: 1710500445123, // March 15, 2024
+  seq: 0
+})
+```
+
+### Write to Buffer
+
+Write UUID bytes directly to an existing buffer:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+const buffer = new Uint8Array(32)
+uuidv7(undefined, buffer, 8) // Write 16 bytes starting at offset 8
+
+console.log(buffer.subarray(8, 24)) // UUID bytes
+```
+
+### Nil and Max Constants
+
+Access special UUID constants:
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+
+console.log(uuidv7.NIL)
+// => "00000000-0000-0000-0000-000000000000"
+
+console.log(uuidv7.MAX)
+// => "ffffffff-ffff-ffff-ffff-ffffffffffff"
+```
+
+## Try Other ID Formats
+
+Now that you know the basics, try other ID formats:
+
+<CodeGroup>
+```typescript UUID v4 (Random)
+import { uuidv4 } from 'uniku/uuid/v4'
+
+const id = uuidv4()
+// => "550e8400-e29b-41d4-a716-446655440000"
+```
+
+```typescript ULID (Time-ordered)
+import { ulid } from 'uniku/ulid'
+
+const id = ulid()
+// => "01HW9T2W9W9YJ3JZ1H4P4M2T8Q"
+```
+
+```typescript Nanoid (Compact)
+import { nanoid } from 'uniku/nanoid'
+
+const id = nanoid()
+// => "V1StGXR8_Z5jdHi6B-myT"
+```
+
+```typescript CUID2 (Secure)
+import { cuid2 } from 'uniku/cuid2'
+
+const id = cuid2()
+// => "pfh0haxfpzowht3oi213cqos"
+```
+
+```typescript KSUID (Second-precision)
+import { ksuid } from 'uniku/ksuid'
+
+const id = ksuid()
+// => "2QnJjKLvpSfpZqGiPPxVwWLMy2p"
+```
+</CodeGroup>
+
+## Next Steps
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="API Reference" icon="book" href="/api/uuidv7">
+    Explore the complete API for all ID formats
+  </Card>
+  
+  <Card title="Migration Guide" icon="arrow-right-arrow-left" href="/guides/migration">
+    Migrate from uuid, nanoid, ulid, or other libraries
+  </Card>
+  
+  <Card title="Choosing an ID" icon="star" href="/guides/choosing-an-id">
+    Learn how to choose the right ID format
+  </Card>
+  
+  <Card title="CLI Tool" icon="terminal" href="/cli/overview">
+    Generate and validate IDs from the command line
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

@@ -1,0 +1,141 @@
+---
+title: CLI Tool Overview
+description: Command-line interface for generating, validating, and inspecting unique identifiers
+---
+
+The `@uniku/cli` package provides a powerful command-line tool for working with unique identifiers. It supports UUID v4/v7, ULID, CUID2, Nanoid, and KSUID — enabling you to generate, validate, and inspect IDs directly from your terminal.
+
+## Quick Example
+
+```bash
+# Generate a UUID v7 (time-ordered)
+uniku uuid --version 7
+# => 018e5e5c-7c8a-7000-8000-000000000000
+
+# Generate 5 monotonic ULIDs
+uniku ulid --monotonic --count 5
+
+# Validate an ID (type auto-detected)
+uniku validate 01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+# => Valid ULID
+
+# Inspect a time-ordered ID to extract timestamp
+uniku inspect 018e5e5c-7c8a-7000-8000-000000000000
+# => Shows timestamp, version, and random component
+```
+
+## Available Commands
+
+The CLI provides three main categories of commands:
+
+<CardGroup cols={3}>
+  <Card title="Generate IDs" icon="sparkles" href="/cli/generate">
+    Create new IDs using any supported generator
+  </Card>
+  <Card title="Validate IDs" icon="shield-check" href="/cli/validate">
+    Check if IDs are valid with type auto-detection
+  </Card>
+  <Card title="Inspect IDs" icon="magnifying-glass" href="/cli/inspect">
+    Extract metadata from time-ordered IDs
+  </Card>
+</CardGroup>
+
+### Generation Commands
+
+All generation commands support both the explicit `uniku generate <type>` format and shorthand syntax:
+
+| Command | Description | Shorthand |
+|---------|-------------|----------|
+| `uniku generate uuid` | Generate UUIDs (v4 or v7) | `uniku uuid` |
+| `uniku generate ulid` | Generate ULIDs | `uniku ulid` |
+| `uniku generate nanoid` | Generate Nanoids | `uniku nanoid` |
+| `uniku generate cuid` | Generate CUIDs (v2) | `uniku cuid` |
+| `uniku generate ksuid` | Generate KSUIDs | `uniku ksuid` |
+
+### Utility Commands
+
+| Command | Description |
+|---------|-------------|
+| `uniku validate <id>` | Check if an ID is valid (with type auto-detection) |
+| `uniku inspect <id>` | Decode and inspect metadata from an ID |
+
+## Common Options
+
+These options work across most commands:
+
+<ParamField path="--count" type="number" default="1">
+  Number of IDs to generate. Alias: `-n`
+  
+  ```bash
+  uniku uuid --count 10
+  ```
+</ParamField>
+
+<ParamField path="--json" type="boolean" default="false">
+  Output results as JSON for programmatic use
+  
+  ```bash
+  uniku uuid --count 3 --json
+  # [{"id":"..."},{"id":"..."},{"id":"..."}]
+  ```
+</ParamField>
+
+<ParamField path="--help" type="boolean">
+  Show help information for any command
+  
+  ```bash
+  uniku uuid --help
+  uniku validate --help
+  ```
+</ParamField>
+
+<ParamField path="--version" type="boolean">
+  Show the CLI version. Alias: `-V`
+  
+  ```bash
+  uniku --version
+  ```
+</ParamField>
+
+## Output Formats
+
+By default, commands output plain text (one ID per line). Use `--json` for structured output:
+
+<CodeGroup>
+```bash Plain Text
+uniku uuid --count 3
+550e8400-e29b-41d4-a716-446655440000
+6ba7b810-9dad-11d1-80b4-00c04fd430c8
+7c9e6679-7425-40de-944b-e07fc1f90ae7
+```
+
+```bash JSON Output
+uniku uuid --count 3 --json
+[
+  {"id":"550e8400-e29b-41d4-a716-446655440000"},
+  {"id":"6ba7b810-9dad-11d1-80b4-00c04fd430c8"},
+  {"id":"7c9e6679-7425-40de-944b-e07fc1f90ae7"}
+]
+```
+</CodeGroup>
+
+<Info>
+The CLI uses the Web Crypto API for secure random number generation, ensuring cryptographically strong IDs across all generators.
+</Info>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/cli/installation">
+    Install the CLI using pre-built binaries or npm
+  </Card>
+  <Card title="Generate IDs" icon="sparkles" href="/cli/generate">
+    Learn how to generate IDs with all supported types
+  </Card>
+  <Card title="Validate IDs" icon="shield-check" href="/cli/validate">
+    Validate IDs with automatic type detection
+  </Card>
+  <Card title="Inspect IDs" icon="magnifying-glass" href="/cli/inspect">
+    Extract timestamps and metadata from IDs
+  </Card>
+</CardGroup>

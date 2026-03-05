@@ -1,0 +1,425 @@
+---
+title: "ksuid"
+description: "Generate K-Sortable Unique Identifiers with second precision timestamps"
+---
+
+# KSUID
+
+Generate a KSUID string or write the bytes into a buffer.
+
+KSUID (K-Sortable Unique Identifier) is a 160-bit identifier consisting of a 4-byte timestamp (seconds since KSUID epoch: May 13, 2014) and 16 bytes of cryptographically random payload. Encoded as a 27-character Base62 string.
+
+## Import
+
+```typescript
+import { ksuid } from 'uniku/ksuid'
+```
+
+## Function Signature
+
+```typescript
+type Ksuid = {
+  (): string
+  <TBuf extends Uint8Array = Uint8Array>(options: KsuidOptions | undefined, buf: TBuf, offset?: number): TBuf
+  (options?: KsuidOptions, buf?: undefined, offset?: number): string
+  toBytes(id: string): Uint8Array
+  fromBytes(bytes: Uint8Array): string
+  timestamp(id: string): number
+  isValid(id: unknown): id is string
+  NIL: string
+  MAX: string
+}
+```
+
+## Basic Usage
+
+<CodeGroup>
+```typescript Generate KSUID
+const id = ksuid()
+// => "2QnJjKLvpSfpZqGiPPxVwWLMy2p"
+```
+
+```typescript Sortable by creation time
+const [first, second, third] = [ksuid(), ksuid(), ksuid()]
+console.log(first < second && second < third) // true
+```
+
+```typescript Extract timestamp
+const id = ksuid()
+const ts = ksuid.timestamp(id)
+console.log(new Date(ts))
+// => Current date/time
+```
+
+```typescript Convert to/from bytes
+const id = ksuid()
+const bytes = ksuid.toBytes(id)       // => Uint8Array(20)
+const restored = ksuid.fromBytes(bytes) // => original KSUID string
+```
+</CodeGroup>
+
+## Options
+
+<ParamField path="options" type="KsuidOptions" optional>
+  Configuration options for KSUID generation
+</ParamField>
+
+<Expandable title="KsuidOptions">
+  <ParamField path="random" type="Uint8Array" optional>
+    16 bytes of random data to use for KSUID payload.
+  </ParamField>
+
+  <ParamField path="secs" type="number" optional>
+    Timestamp in seconds since Unix epoch.
+    
+    Defaults to `Math.floor(Date.now() / 1000)`.
+    
+    **Note:** KSUID natively uses second precision (unlike UUID v7 and ULID which use milliseconds).
+  </ParamField>
+</Expandable>
+
+## Buffer Mode
+
+Write KSUID bytes directly to a buffer at a specific offset:
+
+<ParamField path="options" type="KsuidOptions | undefined" optional>
+  Configuration options (can be undefined)
+</ParamField>
+
+<ParamField path="buf" type="Uint8Array" required>
+  Target buffer to write the KSUID bytes into (20 bytes required)
+</ParamField>
+
+<ParamField path="offset" type="number" optional default="0">
+  Byte offset in the buffer where KSUID should be written
+</ParamField>
+
+<ResponseField name="return" type="Uint8Array">
+  Returns the same buffer instance that was passed in
+</ResponseField>
+
+```typescript
+const buffer = new Uint8Array(40)
+ksuid(undefined, buffer, 0)  // writes 20 bytes at offset 0
+ksuid(undefined, buffer, 20) // writes 20 bytes at offset 20
+```
+
+## Static Methods
+
+### toBytes()
+
+Convert a KSUID string to a byte array.
+
+<ParamField path="id" type="string" required>
+  KSUID string in Base62 format (e.g., "2QnJjKLvpSfpZqGiPPxVwWLMy2p")
+</ParamField>
+
+<ResponseField name="return" type="Uint8Array">
+  20-byte array representation of the KSUID
+</ResponseField>
+
+```typescript
+const bytes = ksuid.toBytes("2QnJjKLvpSfpZqGiPPxVwWLMy2p")
+// => Uint8Array(20)
+```
+
+**Note:** Base62 is case-sensitive. 'A' (value 10) and 'a' (value 36) decode to different byte values.
+
+### fromBytes()
+
+Convert a byte array to a KSUID string.
+
+<ParamField path="bytes" type="Uint8Array" required>
+  20-byte array representing a KSUID
+</ParamField>
+
+<ResponseField name="return" type="string">
+  KSUID string in Base62 format (27 characters)
+</ResponseField>
+
+```typescript
+const bytes = new Uint8Array(20)
+const id = ksuid.fromBytes(bytes)
+// => "000000000000000000000000000"
+```
+
+### timestamp()
+
+Extract the embedded timestamp from a KSUID string.
+
+<ParamField path="id" type="string" required>
+  KSUID string to extract timestamp from
+</ParamField>
+
+<ResponseField name="return" type="number">
+  Unix timestamp in milliseconds (for API consistency with ulid/uuidv7)
+</ResponseField>
+
+```typescript
+const id = ksuid()
+const ts = ksuid.timestamp(id)
+
+console.log(new Date(ts))
+// => Date object representing when the KSUID was created
+
+console.log(Date.now() - ts)
+// => Milliseconds elapsed since KSUID creation
+```
+
+**Important:** 
+- KSUID only has **second precision**, so the returned millisecond timestamp will always end in `000`
+- The timestamp is returned in milliseconds (not seconds) for API consistency with `ulid.timestamp()` and `uuidv7.timestamp()`
+
+### isValid()
+
+Validate whether a value is a valid KSUID string (type guard).
+
+<ParamField path="id" type="unknown" required>
+  Value to validate
+</ParamField>
+
+<ResponseField name="return" type="id is string">
+  Type predicate: `true` if the value is a valid KSUID string, `false` otherwise
+</ResponseField>
+
+```typescript
+const maybeKsuid: unknown = getUserInput()
+
+if (ksuid.isValid(maybeKsuid)) {
+  // TypeScript now knows maybeKsuid is a string
+  const timestamp = ksuid.timestamp(maybeKsuid)
+}
+```
+
+**Validation rules:**
+- Must be a string
+- Must be exactly 27 characters
+- Must match the pattern: `/^[0-9A-Za-z]{27}$/`
+- Must contain only Base62 characters
+
+**Note:** Both uppercase and lowercase letters are valid Base62 characters, but they represent different values (e.g., 'A' = 10, 'a' = 36).
+
+## Constants
+
+### NIL
+
+The nil KSUID (all zeros).
+
+```typescript
+ksuid.NIL
+// => "000000000000000000000000000"
+```
+
+### MAX
+
+The max KSUID (maximum valid value).
+
+```typescript
+ksuid.MAX
+// => "aWgEPTl1tmebfsQzFP4bxwgy80V"
+```
+
+## KSUID Epoch
+
+KSUID uses a custom epoch: **May 13, 2014 00:00:00 UTC** (Unix timestamp: 1400000000)
+
+This was chosen to:
+- Extend the lifetime of the timestamp field
+- Start from a more recent date than Unix epoch (1970)
+- Accommodate timestamps until approximately year 2150
+
+```typescript
+const KSUID_EPOCH = 1400000000 // seconds
+
+// When generating with explicit timestamp:
+const unixSecs = Math.floor(Date.now() / 1000)
+const ksuidSecs = unixSecs - KSUID_EPOCH
+
+const id = ksuid({ secs: unixSecs })
+```
+
+## Structure
+
+KSUID format (160 bits / 20 bytes):
+
+```
+Bytes 0-3:   32-bit timestamp (seconds since KSUID epoch: May 13, 2014)
+Bytes 4-19:  128 bits of cryptographically random payload
+```
+
+Encoded as 27 characters in Base62:
+```
+0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
+```
+
+## Advanced Usage
+
+### Deterministic Generation (Testing)
+
+Provide explicit options for reproducible KSUIDs:
+
+```typescript
+const id = ksuid({
+  secs: 1702387456, // Unix timestamp in seconds
+  random: new Uint8Array(16)
+})
+// Always generates the same KSUID for the same inputs
+```
+
+### Custom Timestamp
+
+Generate KSUIDs with a specific timestamp:
+
+```typescript
+const pastTime = Math.floor((Date.now() - 86400000) / 1000) // 24 hours ago in seconds
+const id = ksuid({ secs: pastTime })
+
+console.log(ksuid.timestamp(id)) // Returns milliseconds
+```
+
+### Custom Random Source
+
+Provide your own random bytes:
+
+```typescript
+const myRandomBytes = new Uint8Array(16)
+crypto.getRandomValues(myRandomBytes)
+
+const id = ksuid({ random: myRandomBytes })
+```
+
+## Cloudflare Workers Note
+
+By default, Cloudflare Workers "freeze" time during request handling to prevent side-channel attacks. This means `Date.now()` returns the same value for the entire request duration.
+
+**Implications:**
+- All KSUIDs generated within a single request will have the same timestamp
+- Sorting relies on the random payload bytes, not the timestamp
+
+## Errors
+
+<ResponseField name="InvalidInputError" type="Error">
+  Thrown when options are invalid:
+  
+  - **Code:** `KSUID_RANDOM_BYTES_TOO_SHORT` - Random bytes length must be >= 16
+  - **Code:** `KSUID_TIMESTAMP_TOO_LOW` - Timestamp must be >= KSUID epoch (1400000000)
+</ResponseField>
+
+<ResponseField name="BufferError" type="Error">
+  Thrown when buffer offset is out of bounds
+  
+  **Code:** `KSUID_BUFFER_OUT_OF_BOUNDS`
+</ResponseField>
+
+<ResponseField name="ParseError" type="Error">
+  Thrown when parsing an invalid KSUID string format
+</ResponseField>
+
+```typescript
+import { InvalidInputError, BufferError, ParseError } from 'uniku/ksuid'
+
+try {
+  const id = ksuid({ secs: 100 }) // Before KSUID epoch
+} catch (error) {
+  if (error instanceof InvalidInputError) {
+    console.log(error.code) // => "KSUID_TIMESTAMP_TOO_LOW"
+  }
+}
+```
+
+## Type Definitions
+
+```typescript
+export type KsuidOptions = {
+  /**
+   * 16 bytes of random data to use for KSUID payload.
+   */
+  random?: Uint8Array
+  /**
+   * Timestamp in seconds since Unix epoch.
+   * Defaults to Math.floor(Date.now() / 1000).
+   * KSUID natively uses second precision.
+   */
+  secs?: number
+}
+
+export type Ksuid = {
+  (): string
+  <TBuf extends Uint8Array = Uint8Array>(options: KsuidOptions | undefined, buf: TBuf, offset?: number): TBuf
+  (options?: KsuidOptions, buf?: undefined, offset?: number): string
+  toBytes(id: string): Uint8Array
+  fromBytes(bytes: Uint8Array): string
+  timestamp(id: string): number
+  isValid(id: unknown): id is string
+  /** The nil KSUID (all zeros) */
+  NIL: string
+  /** The max KSUID (maximum valid value) */
+  MAX: string
+}
+```
+
+## Comparison with Other IDs
+
+| Feature | KSUID | UUID v7 | ULID |
+|---------|-------|---------|------|
+| Format | 27-char Base62 | 36-char hex + hyphens | 26-char Base32 |
+| Timestamp precision | Second (32 bits) | Millisecond (48 bits) | Millisecond (48 bits) |
+| Randomness | 128 bits | 74 bits | 80 bits |
+| Binary size | 20 bytes | 16 bytes | 16 bytes |
+| URL-safe | Yes | No (hyphens) | Yes |
+| Case-sensitive | Yes | No | No |
+| Epoch | May 13, 2014 | Unix epoch | Unix epoch |
+| Lexicographic sorting | Yes | Yes | Yes |
+
+**Key differences:**
+- KSUID has **second precision** (vs millisecond for UUID v7/ULID)
+- KSUID has **more randomness** (128 bits vs 74-80 bits)
+- KSUID is **larger** (20 bytes vs 16 bytes)
+- KSUID uses **Base62 encoding** (case-sensitive)
+
+## Use Cases
+
+KSUID is ideal for:
+- **Distributed systems**: High entropy prevents collisions
+- **Database keys**: Sortable, no coordination needed
+- **Event ordering**: Second precision is often sufficient
+- **Log aggregation**: Sortable across services
+
+**Not ideal for:**
+- **High-frequency events**: Second precision may be too coarse (use UUID v7 or ULID instead)
+- **Case-insensitive systems**: Base62 is case-sensitive
+- **Storage-constrained systems**: 20 bytes is larger than UUID/ULID
+
+## Migration from @owpz/ksuid
+
+If migrating from the `@owpz/ksuid` npm package:
+
+```diff
+- import { KSUID } from '@owpz/ksuid'
++ import { ksuid } from 'uniku/ksuid'
+
+- const id = KSUID.random().toString()
++ const id = ksuid()
+
+- const bytes = KSUID.random().toBuffer()
++ const bytes = ksuid(undefined, new Uint8Array(20))
+
+- const parsed = KSUID.parse(str)
+- const timestamp = parsed.timestamp
++ const timestamp = ksuid.timestamp(str)
+
+- const fromBuf = KSUID.fromBytes(buffer).toString()
++ const fromStr = ksuid.fromBytes(bytes)
+```
+
+**Key differences:**
+- uniku uses a functional API (`ksuid()`) vs class-based API (`KSUID.random()`)
+- uniku uses standard `Uint8Array` instead of Node.js `Buffer`
+- uniku's `timestamp()` returns milliseconds (for API consistency)
+- uniku doesn't include `Sequence`, `CompressedSet`, or sorting utilities
+
+## See Also
+
+- [UUID v7](/api/uuidv7) - Time-ordered with millisecond precision
+- [ULID](/api/ulid) - Time-ordered with millisecond precision and Crockford Base32
+- [CUID2](/api/cuid2) - Hash-based secure IDs

@@ -1,0 +1,354 @@
+---
+title: "uuidv7"
+description: "Generate time-ordered UUID v7 identifiers with millisecond precision"
+---
+
+# UUID v7
+
+Generate a UUID v7 string or write the bytes into a buffer.
+
+UUID v7 is a time-ordered UUID that embeds a Unix timestamp in milliseconds, making IDs naturally sortable by creation time. Ideal for database primary keys where chronological ordering improves index performance.
+
+## Import
+
+```typescript
+import { uuidv7 } from 'uniku/uuid/v7'
+```
+
+## Function Signature
+
+```typescript
+type UuidV7 = {
+  (): string
+  <TBuf extends Uint8Array = Uint8Array>(options: UuidV7Options | undefined, buf: TBuf, offset?: number): TBuf
+  (options?: UuidV7Options, buf?: undefined, offset?: number): string
+  toBytes(id: string): Uint8Array
+  fromBytes(bytes: Uint8Array): string
+  timestamp(id: string): number
+  isValid(id: unknown): id is string
+  NIL: string
+  MAX: string
+}
+```
+
+## Basic Usage
+
+<CodeGroup>
+```typescript Generate UUID v7
+const id = uuidv7()
+// => "018e5e5c-7c8a-7000-8000-000000000000"
+```
+
+```typescript Time-ordered IDs
+const [first, second, third] = [uuidv7(), uuidv7(), uuidv7()]
+console.log(first < second && second < third) // true
+```
+
+```typescript Extract timestamp
+const id = uuidv7()
+const ts = uuidv7.timestamp(id)
+console.log(new Date(ts))
+// => Current date/time
+```
+
+```typescript Validate and convert
+if (uuidv7.isValid(id)) {
+  const bytes = uuidv7.toBytes(id)
+  const restored = uuidv7.fromBytes(bytes)
+}
+```
+</CodeGroup>
+
+## Options
+
+<ParamField path="options" type="UuidV7Options" optional>
+  Configuration options for UUID generation
+</ParamField>
+
+<Expandable title="UuidV7Options">
+  <ParamField path="random" type="Uint8Array" optional>
+    16 bytes of random data to use for UUID generation.
+    
+    **Note:** Several bytes will be overwritten with timestamp, version, and variant data.
+  </ParamField>
+
+  <ParamField path="msecs" type="number" optional>
+    Timestamp in milliseconds since Unix epoch.
+    
+    Defaults to `Date.now()`.
+  </ParamField>
+
+  <ParamField path="seq" type="number" optional>
+    31-bit sequence number for monotonic ordering within the same millisecond.
+    
+    When not provided, automatically derived from random bytes or incremented from module state.
+  </ParamField>
+</Expandable>
+
+## Buffer Mode
+
+Write UUID bytes directly to a buffer at a specific offset:
+
+<ParamField path="options" type="UuidV7Options | undefined" optional>
+  Configuration options (can be undefined)
+</ParamField>
+
+<ParamField path="buf" type="Uint8Array" required>
+  Target buffer to write the UUID bytes into (16 bytes required)
+</ParamField>
+
+<ParamField path="offset" type="number" optional default="0">
+  Byte offset in the buffer where UUID should be written
+</ParamField>
+
+<ResponseField name="return" type="Uint8Array">
+  Returns the same buffer instance that was passed in
+</ResponseField>
+
+```typescript
+const buffer = new Uint8Array(32)
+uuidv7(undefined, buffer, 8) // writes 16 bytes starting at offset 8
+```
+
+## Static Methods
+
+### toBytes()
+
+Convert a UUID string to a byte array.
+
+<ParamField path="id" type="string" required>
+  UUID v7 string in standard format (e.g., "018e5e5c-7c8a-7000-8000-000000000000")
+</ParamField>
+
+<ResponseField name="return" type="Uint8Array">
+  16-byte array representation of the UUID
+</ResponseField>
+
+```typescript
+const bytes = uuidv7.toBytes("018e5e5c-7c8a-7000-8000-000000000000")
+// => Uint8Array(16)
+```
+
+### fromBytes()
+
+Convert a byte array to a UUID string.
+
+<ParamField path="bytes" type="Uint8Array" required>
+  16-byte array representing a UUID
+</ParamField>
+
+<ResponseField name="return" type="string">
+  UUID v7 string in standard format with hyphens
+</ResponseField>
+
+```typescript
+const bytes = new Uint8Array(16)
+const uuid = uuidv7.fromBytes(bytes)
+// => UUID v7 string
+```
+
+### timestamp()
+
+Extract the embedded timestamp from a UUID v7 string.
+
+<ParamField path="id" type="string" required>
+  UUID v7 string to extract timestamp from
+</ParamField>
+
+<ResponseField name="return" type="number">
+  Unix timestamp in milliseconds
+</ResponseField>
+
+```typescript
+const id = uuidv7()
+const ts = uuidv7.timestamp(id)
+
+console.log(new Date(ts))
+// => Date object representing when the UUID was created
+
+console.log(Date.now() - ts)
+// => Milliseconds elapsed since UUID creation
+```
+
+### isValid()
+
+Validate whether a value is a valid UUID v7 string (type guard).
+
+<ParamField path="id" type="unknown" required>
+  Value to validate
+</ParamField>
+
+<ResponseField name="return" type="id is string">
+  Type predicate: `true` if the value is a valid UUID v7 string, `false` otherwise
+</ResponseField>
+
+```typescript
+const maybeUuid: unknown = getUserInput()
+
+if (uuidv7.isValid(maybeUuid)) {
+  // TypeScript now knows maybeUuid is a string
+  const timestamp = uuidv7.timestamp(maybeUuid)
+}
+```
+
+**Validation rules:**
+- Must be a string
+- Must match the pattern: `/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i`
+- Version bit (13th hex digit) must be `7`
+- Variant bits (17th hex digit) must be `8`, `9`, `a`, or `b`
+
+## Constants
+
+### NIL
+
+The nil UUID (all zeros).
+
+```typescript
+uuidv7.NIL
+// => "00000000-0000-0000-0000-000000000000"
+```
+
+### MAX
+
+The max UUID (all ones).
+
+```typescript
+uuidv7.MAX
+// => "ffffffff-ffff-ffff-ffff-ffffffffffff"
+```
+
+## Monotonic Ordering
+
+UUID v7 maintains module-level state to ensure IDs are monotonically increasing even when generated within the same millisecond:
+
+```typescript
+// All called within the same millisecond
+const id1 = uuidv7() // seq = random value
+const id2 = uuidv7() // seq = incremented
+const id3 = uuidv7() // seq = incremented again
+
+// Guaranteed to be in order
+console.log(id1 < id2 && id2 < id3) // true
+```
+
+**Important:** This module-level state persists across calls:
+- In serverless/edge functions with warm starts, state persists between invocations
+- For isolated state, pass explicit `msecs` and `seq` via options
+- Tests should mock `Date.now()` or provide explicit options for deterministic behavior
+
+## Advanced Usage
+
+### Deterministic Generation (Testing)
+
+Provide explicit options for reproducible UUIDs:
+
+```typescript
+const id = uuidv7({
+  msecs: 1702387456789,
+  seq: 0,
+  random: new Uint8Array(16)
+})
+// Always generates the same UUID for the same inputs
+```
+
+### Custom Timestamp
+
+Generate UUIDs with a specific timestamp:
+
+```typescript
+const pastTime = Date.now() - 86400000 // 24 hours ago
+const id = uuidv7({ msecs: pastTime })
+
+console.log(uuidv7.timestamp(id) === pastTime) // true
+```
+
+### Write Multiple UUIDs
+
+Efficiently write multiple UUIDs to a pre-allocated buffer:
+
+```typescript
+const buffer = new Uint8Array(64) // Space for 4 UUIDs
+
+uuidv7(undefined, buffer, 0)  // First UUID at offset 0
+uuidv7(undefined, buffer, 16) // Second UUID at offset 16
+uuidv7(undefined, buffer, 32) // Third UUID at offset 32
+uuidv7(undefined, buffer, 48) // Fourth UUID at offset 48
+```
+
+## Structure
+
+UUID v7 format (128 bits / 16 bytes):
+
+```
+Bytes 0-5:   48-bit timestamp (milliseconds since Unix epoch)
+Byte 6:      Version (7) + 4 bits of sequence
+Byte 7:      8 bits of sequence
+Byte 8:      Variant (10xx) + 6 bits of sequence
+Byte 9:      8 bits of sequence
+Bytes 10-15: Random data
+```
+
+Total: 48-bit timestamp + 31-bit sequence + 49 bits of randomness
+
+## Errors
+
+<ResponseField name="InvalidInputError" type="Error">
+  Thrown when random bytes array is too short (< 16 bytes)
+  
+  **Code:** `UUID_RANDOM_BYTES_TOO_SHORT`
+</ResponseField>
+
+<ResponseField name="BufferError" type="Error">
+  Thrown when buffer offset is out of bounds
+  
+  **Code:** `UUID_BUFFER_OUT_OF_BOUNDS`
+</ResponseField>
+
+<ResponseField name="ParseError" type="Error">
+  Thrown when parsing an invalid UUID string format
+</ResponseField>
+
+```typescript
+import { InvalidInputError, BufferError, ParseError } from 'uniku/uuid/v7'
+```
+
+## Type Definitions
+
+```typescript
+export type UuidV7Options = {
+  /**
+   * 16 bytes of random data to use for UUID generation.
+   * Note: Several bytes will be overwritten with timestamp, version, and variant data.
+   */
+  random?: Uint8Array
+  msecs?: number
+  seq?: number
+}
+
+export type UuidV7 = {
+  (): string
+  <TBuf extends Uint8Array = Uint8Array>(options: UuidV7Options | undefined, buf: TBuf, offset?: number): TBuf
+  (options?: UuidV7Options, buf?: undefined, offset?: number): string
+  toBytes(id: string): Uint8Array
+  fromBytes(bytes: Uint8Array): string
+  timestamp(id: string): number
+  isValid(id: unknown): id is string
+  /** The nil UUID (all zeros) */
+  NIL: string
+  /** The max UUID (all ones) */
+  MAX: string
+}
+```
+
+## Performance
+
+The hot path (no options provided) is highly optimized:
+- Inline state management
+- Reusable buffer to avoid allocations
+- Direct byte generation without intermediate copies
+
+## See Also
+
+- [UUID v4](/api/uuidv4) - Random UUID without time ordering
+- [ULID](/api/ulid) - Lexicographically sortable alternative with Crockford Base32 encoding
+- [KSUID](/api/ksuid) - Time-ordered with second precision

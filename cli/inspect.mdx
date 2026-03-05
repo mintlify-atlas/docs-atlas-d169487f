@@ -1,0 +1,360 @@
+---
+title: Inspect IDs
+description: Extract timestamps and metadata from time-ordered unique identifiers
+---
+
+The `inspect` command decodes and extracts metadata from time-ordered IDs. It reveals embedded timestamps, random components, and other structural information.
+
+## Basic Usage
+
+Inspect an ID with automatic type detection:
+
+```bash
+# Inspect UUID v7
+uniku inspect 018e5e5c-7c8a-7000-8000-000000000000
+
+# Inspect ULID
+uniku inspect 01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+
+# Inspect KSUID
+uniku inspect 2HbcvN9VFGzP8jR5mK3QxW4d
+```
+
+The CLI automatically detects the ID type and extracts available metadata.
+
+## Time-Ordered IDs
+
+Time-ordered IDs embed timestamps and can be inspected to reveal creation time:
+
+### UUID v7
+
+UUID v7 embeds a Unix timestamp with millisecond precision:
+
+```bash
+uniku inspect 018e5e5c-7c8a-7000-8000-000000000000
+```
+
+Output:
+```
+Type:      UUID v7
+Timestamp: 2024-03-15T10:30:45.123Z
+Time (ms): 1710500445123
+Random:    0000800000000000
+```
+
+The output shows:
+- **Type**: Detected ID type and version
+- **Timestamp**: ISO 8601 formatted timestamp
+- **Time (ms)**: Unix timestamp in milliseconds
+- **Random**: Hex-encoded random component (last 6 bytes)
+
+### ULID
+
+ULID embeds a Unix timestamp with millisecond precision:
+
+```bash
+uniku inspect 01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+```
+
+Output:
+```
+Type:      ULID
+Timestamp: 2024-03-15T10:30:45.123Z
+Time (ms): 1710500445123
+Random:    9YJ3JZ1H4P4M2T8Q
+```
+
+The output shows:
+- **Type**: ULID
+- **Timestamp**: ISO 8601 formatted timestamp
+- **Time (ms)**: Unix timestamp in milliseconds
+- **Random**: Last 16 characters (80-bit random component)
+
+### KSUID
+
+KSUID embeds a Unix timestamp with second precision:
+
+```bash
+uniku inspect 2HbcvN9VFGzP8jR5mK3QxW4d
+```
+
+Output:
+```
+Type:      KSUID
+Timestamp: 2024-03-15T10:30:45.000Z
+Time (ms): 1710500445000
+Random:    8a7b6c5d4e3f2a1b9c8d7e6f5a4b3c2d
+```
+
+The output shows:
+- **Type**: KSUID
+- **Timestamp**: ISO 8601 formatted timestamp
+- **Time (ms)**: Unix timestamp in milliseconds (converted from seconds)
+- **Random**: Hex-encoded payload (last 16 bytes)
+
+<Info>
+KSUIDs store timestamps with second precision, while UUID v7 and ULID use millisecond precision.
+</Info>
+
+## Random-Only IDs
+
+Random-only IDs don't contain decodable metadata:
+
+```bash
+# UUID v4
+uniku inspect 550e8400-e29b-41d4-a716-446655440000
+```
+
+Output:
+```
+Type: UUID v4
+Note: This ID type contains no decodable metadata.
+```
+
+```bash
+# Nanoid
+uniku inspect V1StGXR8_Z5jdHi6B-myT
+```
+
+Output:
+```
+Type: Nanoid
+Note: This ID type contains no decodable metadata.
+```
+
+```bash
+# CUID2
+uniku inspect clhw9t2w9w9yj3jz1h4p4m2t
+```
+
+Output:
+```
+Type: CUID2
+Note: This ID type contains no decodable metadata.
+```
+
+<Warning>
+Random-only IDs (UUID v4, Nanoid, CUID2) cannot be inspected for timestamps or other metadata. They only return the detected type.
+</Warning>
+
+## Explicit Type Specification
+
+Specify the ID type explicitly using `--type`:
+
+```bash
+# Force interpretation as ULID
+uniku inspect --type ulid 01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+
+# Force interpretation as UUID
+uniku inspect --type uuid 018e5e5c-7c8a-7000-8000-000000000000
+```
+
+<ParamField path="--type" type="uuid | ulid | nanoid | cuid | ksuid">
+  ID type to inspect. If omitted, type is auto-detected.
+  
+  ```bash
+  uniku inspect --type ulid 01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+  ```
+</ParamField>
+
+<Tip>
+Auto-detection is usually accurate, but explicit type specification is faster and guarantees correct parsing.
+</Tip>
+
+## JSON Output
+
+Get structured metadata with `--json`:
+
+```bash
+uniku inspect --json 018e5e5c-7c8a-7000-8000-000000000000
+```
+
+```json
+{
+  "id": "018e5e5c-7c8a-7000-8000-000000000000",
+  "type": "uuid",
+  "version": 7,
+  "timestamp": "2024-03-15T10:30:45.123Z",
+  "timestamp_ms": 1710500445123,
+  "random": "0000800000000000"
+}
+```
+
+<ParamField path="--json" type="boolean" default="false">
+  Output inspection results as JSON
+  
+  ```bash
+  uniku inspect --json 01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+  ```
+</ParamField>
+
+### ULID JSON
+
+```bash
+uniku inspect --json 01HW9T2W9W9YJ3JZ1H4P4M2T8Q
+```
+
+```json
+{
+  "id": "01HW9T2W9W9YJ3JZ1H4P4M2T8Q",
+  "type": "ulid",
+  "timestamp": "2024-03-15T10:30:45.123Z",
+  "timestamp_ms": 1710500445123,
+  "random": "9YJ3JZ1H4P4M2T8Q"
+}
+```
+
+### KSUID JSON
+
+```bash
+uniku inspect --json 2HbcvN9VFGzP8jR5mK3QxW4d
+```
+
+```json
+{
+  "id": "2HbcvN9VFGzP8jR5mK3QxW4d",
+  "type": "ksuid",
+  "timestamp": "2024-03-15T10:30:45.000Z",
+  "timestamp_ms": 1710500445000,
+  "random": "8a7b6c5d4e3f2a1b9c8d7e6f5a4b3c2d"
+}
+```
+
+### Random-Only ID JSON
+
+```bash
+uniku inspect --json 550e8400-e29b-41d4-a716-446655440000
+```
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "type": "uuid",
+  "version": 4,
+  "note": "This ID type contains no decodable metadata."
+}
+```
+
+## Examples
+
+### Batch Inspection
+
+Inspect multiple IDs using shell loops:
+
+```bash
+# Inspect IDs from a file
+while read -r id; do
+  echo "Inspecting: $id"
+  uniku inspect "$id"
+  echo
+done < ids.txt
+```
+
+### Extract Timestamps
+
+Extract just the timestamps using jq:
+
+```bash
+# Get timestamp from UUID v7
+uniku inspect --json 018e5e5c-7c8a-7000-8000-000000000000 | jq -r '.timestamp'
+# => 2024-03-15T10:30:45.123Z
+
+# Get Unix timestamp in milliseconds
+uniku inspect --json 01HW9T2W9W9YJ3JZ1H4P4M2T8Q | jq '.timestamp_ms'
+# => 1710500445123
+```
+
+### Sort IDs by Timestamp
+
+Sort time-ordered IDs by their embedded timestamps:
+
+```bash
+# Generate IDs with JSON, extract timestamps, and sort
+cat ids.txt | while read -r id; do
+  uniku inspect --json "$id"
+done | jq -s 'sort_by(.timestamp_ms) | .[] | "\(.timestamp): \(.id)"'
+```
+
+### Calculate ID Age
+
+Calculate how old an ID is:
+
+```bash
+#!/bin/bash
+ID="018e5e5c-7c8a-7000-8000-000000000000"
+TIMESTAMP=$(uniku inspect --json "$ID" | jq '.timestamp_ms')
+NOW=$(date +%s000)  # Current time in milliseconds
+AGE_MS=$((NOW - TIMESTAMP))
+AGE_HOURS=$((AGE_MS / 1000 / 60 / 60))
+
+echo "ID is $AGE_HOURS hours old"
+```
+
+### Verify ID Order
+
+Verify that time-ordered IDs are properly sorted:
+
+```bash
+# Check if IDs are in chronological order
+cat ids.txt | while read -r id; do
+  uniku inspect --json "$id" | jq -r '.timestamp_ms'
+done | awk 'NR>1 && $1<prev {print "Out of order!"; exit 1} {prev=$1}'
+```
+
+## Metadata Fields
+
+Here's what each field means:
+
+<ParamField path="id" type="string">
+  The inspected ID (echoed back)
+</ParamField>
+
+<ParamField path="type" type="string">
+  Detected ID type: `uuid`, `ulid`, `ksuid`, `cuid`, or `nanoid`
+</ParamField>
+
+<ParamField path="version" type="number">
+  UUID version (4 or 7). Only present for UUIDs.
+</ParamField>
+
+<ParamField path="timestamp" type="string">
+  ISO 8601 formatted timestamp. Only present for time-ordered IDs.
+</ParamField>
+
+<ParamField path="timestamp_ms" type="number">
+  Unix timestamp in milliseconds. Only present for time-ordered IDs.
+</ParamField>
+
+<ParamField path="random" type="string">
+  Random component of the ID (hex or base-encoded). Only present for time-ordered IDs.
+</ParamField>
+
+<ParamField path="note" type="string">
+  Informational message. Present when no metadata is available.
+</ParamField>
+
+## Supported ID Types
+
+| Type | Time-Ordered | Precision | Metadata Available |
+|------|--------------|-----------|-------------------|
+| UUID v4 | No | — | None |
+| UUID v7 | Yes | Millisecond | Timestamp, random |
+| ULID | Yes | Millisecond | Timestamp, random |
+| KSUID | Yes | Second | Timestamp, payload |
+| Nanoid | No | — | None |
+| CUID2 | No | — | None |
+
+<Info>
+Time-ordered IDs are ideal when you need to sort by creation time or extract timestamps without querying a database.
+</Info>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Generate IDs" icon="sparkles" href="/cli/generate">
+    Generate IDs to inspect
+  </Card>
+  <Card title="Validate IDs" icon="shield-check" href="/cli/validate">
+    Validate IDs before inspection
+  </Card>
+</CardGroup>
