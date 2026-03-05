@@ -1,0 +1,115 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "uniku",
+  "projectDescription": "TypeScript ID generator library supporting UUID v4/v7, ULID, CUID2, Nanoid, and KSUID for every JavaScript runtime",
+  "theme": "palm",
+  "primaryColor": "#94cb04",
+  "lightColor": "#545454",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "ID Generators",
+            "pages": [
+              "generators/uuid-v4",
+              "generators/uuid-v7",
+              "generators/ulid",
+              "generators/cuid2",
+              "generators/nanoid",
+              "generators/ksuid"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/choosing-an-id",
+              "guides/performance",
+              "guides/byte-conversion",
+              "guides/migration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI",
+        "groups": [
+          {
+            "group": "CLI Tool",
+            "pages": [
+              "cli/overview",
+              "cli/installation",
+              "cli/generate",
+              "cli/validate",
+              "cli/inspect"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "API",
+            "pages": [
+              "api/uuidv4",
+              "api/uuidv7",
+              "api/ulid",
+              "api/cuid2",
+              "api/nanoid",
+              "api/ksuid",
+              "api/errors"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Six ID formats: UUID v4/v7, ULID, CUID2, Nanoid, KSUID",
+    "Universal runtime support via Web Crypto API",
+    "Tree-shakeable separate entry points",
+    "Byte-level conversion with toBytes/fromBytes",
+    "Time-ordered IDs with monotonic sequencing",
+    "CLI tool for generation, validation, and inspection"
+  ],
+  "publicApiSurface": [
+    "uuidv4",
+    "uuidv7",
+    "ulid",
+    "cuid2",
+    "nanoid",
+    "ksuid",
+    "uuidv4.toBytes",
+    "uuidv4.fromBytes",
+    "uuidv4.isValid",
+    "uuidv7.toBytes",
+    "uuidv7.fromBytes",
+    "uuidv7.timestamp",
+    "uuidv7.isValid",
+    "ulid.toBytes",
+    "ulid.fromBytes",
+    "ulid.timestamp",
+    "ulid.isValid",
+    "cuid2.isValid",
+    "nanoid.isValid",
+    "ksuid.toBytes",
+    "ksuid.fromBytes",
+    "ksuid.timestamp",
+    "ksuid.isValid",
+    "BufferError",
+    "InvalidInputError",
+    "ParseError",
+    "UniqueIdError"
+  ]
+}
